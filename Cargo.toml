@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ble-peripheral-rust = "0.2.0"
 btleplug = "0.12.0"
 futures = "0.3.32"
 tokio = { version = "1.50.0", features = ["full"] }
+uuid = { version = "1.22.0", features = ["v4"] }
