@@ -1,7 +1,8 @@
 mod ble;
-
-use std::error::Error;
+mod rendezvous;
+// use rendezvous::RendezvousManager;
 use std::env;
+use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -22,8 +23,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Attempting to run both concurrently for demonstration...");
 
         // tokio::spawn allows us to spin up an asynchronous task in the background.
-        // NOTE: Running both advertising and discovery simultaneously on the same 
-        // physical Bluetooth adapter might fail or be completely ignored depending 
+        // NOTE: Running both advertising and discovery simultaneously on the same
+        // physical Bluetooth adapter might fail or be completely ignored depending
         // on the specific hardware controller's capabilities.
         let advertiser = tokio::spawn(async {
             if let Err(e) = ble::advertise::advertise_app_service().await {
