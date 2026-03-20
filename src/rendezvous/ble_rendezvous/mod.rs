@@ -5,12 +5,12 @@ use crate::rendezvous::RendezvousTrait;
 pub struct BleRendezvous {}
 
 impl RendezvousTrait for BleRendezvous {
-    fn advertise() -> Result<(), Box<dyn Error>> {
+    async fn advertise() -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting advertisement...");
         Ok(())
     }
     
-    fn discover() -> Result<(), Box<dyn Error>> {
+    async fn discover() -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting discovery...");
         Ok(())
     }

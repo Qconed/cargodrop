@@ -35,24 +35,24 @@ impl RendezvousManager {
     }
 
     // discover devices using relevant implementation (by order of preference)
-    pub fn discover_manage(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn discover_manage(&self) -> Result<(), Box<dyn Error>> {
         match self.rendezvous_impl {
-            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::discover(),
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::discover(),
+            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::discover().await,
+            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::discover().await,
         }
     }
 
     // advertise presence to others using relevant implementation (by order of preference)
-    pub fn advertise_manage(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn advertise_manage(&self) -> Result<(), Box<dyn Error>> {
         match self.rendezvous_impl {
-            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise(),
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise(),
+            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise().await,
+            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise().await,
         }
     }
 }
 
 // traits defining a rendezvous engine (allowing for discovery and advertising)
 pub trait RendezvousTrait {
-    fn discover() -> Result<(), Box<dyn Error>>;
-    fn advertise() -> Result<(), Box<dyn Error>>;
+    async fn discover() -> Result<(), Box<dyn Error>>;
+    async fn advertise() -> Result<(), Box<dyn Error>>;
 }
