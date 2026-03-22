@@ -12,7 +12,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.len() > 1 && args[1] == "advertise" {
         println!("Starting CargoDrop in Advertiser Mode...");
         // Call our new decentralized advertising logic
-        ble::advertise::advertise_app_service().await?;
+        // ble::advertise::advertise_app_service().await?;
+        rendezvous::RendezvousManager::advertise_manage().await?;
     } else if args.len() > 1 && args[1] == "discover" {
         println!("Starting CargoDrop in Discovery Mode...");
         // Call our new decentralized discovery logic

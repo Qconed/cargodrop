@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+base64 = "0.22.1"
 ble-peripheral-rust = "0.2.0"
 btleplug = "0.12.0"
 futures = "0.3.32"
