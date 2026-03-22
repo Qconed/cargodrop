@@ -3,6 +3,7 @@ use std::error::Error;
 use crate::rendezvous::RendezvousTrait;
 
 pub mod advertise;
+pub mod discover;
 
 pub struct BleRendezvous {}
 
@@ -14,6 +15,6 @@ impl RendezvousTrait for BleRendezvous {
     
     async fn discover() -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting discovery...");
-        Ok(())
+        discover::discover_rendezvous().await
     }
 }

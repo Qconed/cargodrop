@@ -5,6 +5,13 @@ use std::error::Error;
 use uuid::Uuid;
 use btleplug::api::PeripheralProperties;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Peer {
+    pub ip: [u8; 4],
+    pub port: u16,
+    pub name: String,
+}
+
 // @TODO
 // The RendezVousManager will be in charge of handling the multiple "P2P" discovery means, and will enable switching between implementations
 // LAN is the preffered method, but DNS-SD is blocked over some networks

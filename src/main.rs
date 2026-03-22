@@ -17,7 +17,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     } else if args.len() > 1 && args[1] == "discover" {
         println!("Starting CargoDrop in Discovery Mode...");
         // Call our new decentralized discovery logic
-        ble::discover::discover_app_peripherals().await?;
+        // ble::discover::discover_app_peripherals().await?;
+        rendezvous::RendezvousManager::discover_manage().await?;
     } else {
         // Provide usage instructions if no argument is given
         println!("Usage: cargo run -- [advertise|discover]");
@@ -28,7 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // physical Bluetooth adapter might fail or be completely ignored depending
         // on the specific hardware controller's capabilities.
         let advertiser = tokio::spawn(async {
-            if let Err(e) = ble::advertise::advertise_app_service().await {
+            if let Err(e) = rendezvous::RendezvousManager::advertise_manage().await {
                 eprintln!("Advertiser error: {}", e);
             }
         });
@@ -37,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let discoverer = tokio::spawn(async {
-            if let Err(e) = ble::discover::discover_app_peripherals().await {
+            if let Err(e) = rendezvous::RendezvousManager::discover_manage().await {
                 eprintln!("Discoverer error: {}", e);
             }
         });
