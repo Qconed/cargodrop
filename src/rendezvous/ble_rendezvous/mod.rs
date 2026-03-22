@@ -7,16 +7,10 @@ pub mod discover;
 
 pub struct BleRendezvous {}
 
-impl BleRendezvous {
-    pub async fn advertise_with_username(username: &str) -> Result<(), Box<dyn Error>> {
-        println!("BLE Rendezvous: Starting advertisement...");
-        advertise::advertise_rendezvous(username).await
-    }
-}
-
 impl RendezvousTrait for BleRendezvous {
     async fn advertise() -> Result<(), Box<dyn Error>> {
-        Self::advertise_with_username("CargoDrop").await
+        println!("BLE Rendezvous: Starting advertisement...");
+        advertise::advertise_rendezvous().await
     }
     
     async fn discover() -> Result<(), Box<dyn Error>> {

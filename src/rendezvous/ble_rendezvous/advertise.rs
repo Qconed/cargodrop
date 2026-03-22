@@ -12,8 +12,6 @@ use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 use uuid::Uuid;
 
-const MAX_SCAN_RESPONSE_USERNAME_BYTES: usize = 20;
-
 #[derive(Debug, Clone, Copy)]
 struct AdvertiseConfig {
     adapter_power_poll: Duration,
@@ -106,41 +104,13 @@ fn build_advertisement_payload() -> ([u8; 4], u16, String) {
     (ip, port, device_name_payload)
 }
 
-/// Builds the scan-response username payload while keeping UTF-8 boundaries intact.
-fn build_scan_response_name(username: &str) -> String {
-    let mut end = 0;
-    for (idx, ch) in username.char_indices() {
-        let next = idx + ch.len_utf8();
-        if next > MAX_SCAN_RESPONSE_USERNAME_BYTES {
-            break;
-        }
-        end = next;
-    }
-
-    if end == 0 {
-        String::new()
-    } else {
-        username[..end].to_string()
-    }
-}
-
-/// ble-peripheral-rust currently exposes a single local_name field, so we encode
-/// both pieces in one deterministic value. The scanner parses the Base64 prefix first.
-fn build_combined_local_name(device_name_payload: &str, scan_response_name: &str) -> String {
-    if scan_response_name.is_empty() {
-        return device_name_payload.to_string();
-    }
-
-    format!("{}|{}", device_name_payload, scan_response_name)
-}
-
 async fn start_advertising(
     peripheral: &mut Peripheral,
     service_uuid: Uuid,
-    local_name_payload: &str,
+    device_name_payload: &str,
 ) -> Result<(), Box<dyn Error>> {
     peripheral
-        .start_advertising(local_name_payload, &[service_uuid])
+        .start_advertising(device_name_payload, &[service_uuid])
         .await?;
     println!("Now actively advertising custom network rendezvous info...");
     Ok(())
@@ -159,54 +129,29 @@ async fn run_advertise_heartbeat(
     ip: [u8; 4],
     port: u16,
     device_name_payload: &str,
-    scan_response_name: &str,
-    local_name_payload: &str,
     config: AdvertiseConfig,
 ) -> Result<(), Box<dyn Error>> {
     loop {
         log_heartbeat(ip, port, device_name_payload);
-        println!(
-            "  Username payload prepared: '{}' (truncated to {} bytes max)",
-            scan_response_name, MAX_SCAN_RESPONSE_USERNAME_BYTES
-        );
-        println!(
-            "  BLE local_name in use: '{}' (scan-response fallback encoding)",
-            local_name_payload
-        );
         sleep(config.heartbeat_interval).await;
     }
 }
 
 /// The main advertising loop that continuously advertises the custom network rendezvous payload.
-pub async fn advertise_rendezvous(username: &str) -> Result<(), Box<dyn Error>> {
+pub async fn advertise_rendezvous() -> Result<(), Box<dyn Error>> {
     let config = AdvertiseConfig::default();
     let service_uuid = Uuid::parse_str(crate::ble::APP_SERVICE_UUID)?;
 
     // 1. Prepare payload components
     let (ip, port, device_name_payload) = build_advertisement_payload();
-    let scan_response_name = build_scan_response_name(username);
-    let local_name_payload = build_combined_local_name(&device_name_payload, &scan_response_name);
-
-    println!(
-        "Prepared BLE username payload for scan response compatibility: '{}'",
-        scan_response_name
-    );
 
     // 2. Initialize BLE Peripheral & Service
     let mut peripheral = init_ble_peripheral(service_uuid).await?;
     wait_until_adapter_powered(&mut peripheral, config).await?;
 
     // 3. Start continuously advertising
-    start_advertising(&mut peripheral, service_uuid, &local_name_payload).await?;
+    start_advertising(&mut peripheral, service_uuid, &device_name_payload).await?;
 
     // 4. Keep process alive and expose liveness heartbeat.
-    run_advertise_heartbeat(
-        ip,
-        port,
-        &device_name_payload,
-        &scan_response_name,
-        &local_name_payload,
-        config,
-    )
-    .await
+    run_advertise_heartbeat(ip, port, &device_name_payload, config).await
 }

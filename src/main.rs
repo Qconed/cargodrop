@@ -6,9 +6,6 @@ use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // TODO: Replace with username from config/CLI.
-    let username = "AliceAuPaysDesMerveilles";
-
     // Collect command line arguments to decide which mode to run in.
     let args: Vec<String> = env::args().collect();
 
@@ -16,7 +13,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Starting CargoDrop in Advertiser Mode...");
         // Call our new decentralized advertising logic
         // ble::advertise::advertise_app_service().await?;
-        rendezvous::RendezvousManager::advertise_manage_with_username(username).await?;
+        rendezvous::RendezvousManager::advertise_manage().await?;
     } else if args.len() > 1 && args[1] == "discover" {
         println!("Starting CargoDrop in Discovery Mode...");
         // Call our new decentralized discovery logic
@@ -32,7 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // physical Bluetooth adapter might fail or be completely ignored depending
         // on the specific hardware controller's capabilities.
         let advertiser = tokio::spawn(async {
-            if let Err(e) = rendezvous::RendezvousManager::advertise_manage_with_username(username).await {
+            if let Err(e) = rendezvous::RendezvousManager::advertise_manage().await {
                 eprintln!("Advertiser error: {}", e);
             }
         });
