@@ -2,11 +2,12 @@ use std::error::Error;
 use std::time::Duration;
 use tokio::time;
 
-use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter};
+use btleplug::api::{Central, CentralEvent, Manager as _, Peripheral as _, ScanFilter};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 
 use crate::rendezvous::Peer;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use futures::stream::StreamExt;
 use uuid::Uuid;
 
 /// Sets up the Bluetooth manager and returns the first available hardware adapter.
@@ -67,50 +68,69 @@ async fn filter_and_parse_peripheral(peripheral: &Peripheral, target_uuid: Uuid)
     })
 }
 
-/// Main entrypoint loop to continuously discover peers every 10 seconds.
+/// Main entrypoint loop to continuously stream and discover peers instantaneously.
 pub async fn discover_rendezvous() -> Result<(), Box<dyn Error>> {
     let target_uuid = Uuid::parse_str(crate::rendezvous::RendezvousManager::APP_SERVICE_UUID)?;
     
     println!("Initializing Bluetooth Discovery Adapter...");
     let adapter = setup_bluetooth_adapter().await?;
     
-    // Filter applied at the hardware hardware level for efficiency
-    let scan_filter = ScanFilter {
-        services: vec![target_uuid],
-    };
+    // Subscribe to the unbuffered native hardware event stream
+    let mut events = adapter.events().await?;
     
-    println!("Entering active CargoDrop BLE scanning loop...");
+    // Start continuous hardware scanning
+    let scan_filter = ScanFilter { services: vec![target_uuid] };
+    adapter.start_scan(scan_filter).await?;
     
+    println!("Entering active CargoDrop BLE streaming loop...");
+
+    // Store active peers (Key: Base64 payload Name, Value: (Peer, Last Seen Timestamp))
+    let mut active_peers: std::collections::HashMap<String, (Peer, tokio::time::Instant)> = std::collections::HashMap::new();
+    
+    // Create an interval timer that ticks every 5 seconds to run our "Device Lost" disconnect logic
+    let mut cleanup_interval = tokio::time::interval(Duration::from_secs(5));
+
     loop {
-        // Start hardware scanning
-        adapter.start_scan(scan_filter.clone()).await?;
-        
-        // Accumulate detections for 10 seconds
-        time::sleep(Duration::from_secs(10)).await;
-        
-        // Gather and process all strictly cached BLE peripherals 
-        let peripherals = adapter.peripherals().await?;
-        let mut detected_peers = Vec::new();
-        
-        for p in peripherals {
-            if let Some(peer) = filter_and_parse_peripheral(&p, target_uuid).await {
-                // We successfully vetted the peripheral and decoded its payload
-                detected_peers.push(peer);
+        tokio::select! {
+            // Branch 1: A hardware event fires the instant the radio receives a packet
+            Some(event) = events.next() => {
+                match event {
+                    // Triggers anytime a packet is heard
+                    CentralEvent::DeviceDiscovered(id) | CentralEvent::DeviceUpdated(id) => {
+                        if let Ok(peripheral) = adapter.peripheral(&id).await {
+                            if let Some(peer) = filter_and_parse_peripheral(&peripheral, target_uuid).await {
+                                let now = tokio::time::Instant::now();
+                                let peer_name = peer.name.clone();
+                                
+                                // Only print if this is a brand new peer we haven't seen yet
+                                // if !active_peers.contains_key(&peer_name) {
+                                    println!("--- [INSTANT] PEER DETECTED ---");
+                                    println!("  + IP: {:?}, Port: {}, Base64: '{}'", peer.ip, peer.port, peer.name);
+                                // }
+                                
+                                // Insert or update the heartbeat timer
+                                active_peers.insert(peer_name, (peer, now));
+                            }
+                        }
+                    }
+                    _ => {} // Ignore connection/disconnection standard events since we're connectionless
+                }
+            }
+            
+            // Branch 2: Our 5-second ticker fires to check for timeout "disconnects"
+            _ = cleanup_interval.tick() => {
+                let now = tokio::time::Instant::now();
+                active_peers.retain(|name, (peer, last_seen)| {
+                    // If we haven't heard an advertising packet from them for 15 seconds, they're gone
+                    if now.duration_since(*last_seen).as_secs() > 15 {
+                        println!("--- [TIMEOUT] PEER LOST ---");
+                        println!("  - IP: {:?}, Port: {}, Base64: '{}' went offline.", peer.ip, peer.port, name);
+                        false // Drop from HashMap
+                    } else {
+                        true // Keep in HashMap
+                    }
+                });
             }
         }
-        
-        // Output detection results
-        println!("--- Scan Cycle Complete ---");
-        if detected_peers.is_empty() {
-             println!("No peers detected nearby.");
-        } else {
-             println!("Detected {} peer(s):", detected_peers.len());
-             for peer in detected_peers {
-                  println!("  - IP: {:?}, Port: {}, Base64: '{}'", peer.ip, peer.port, peer.name);
-             }
-        }
-        
-        // Stop scanning to clear cached peers
-        adapter.stop_scan().await?;
     }
 }
