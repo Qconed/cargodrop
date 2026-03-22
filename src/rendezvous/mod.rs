@@ -7,7 +7,7 @@ use std::error::Error;
 pub struct Peer {
     pub ip: [u8; 4],
     pub port: u16,
-    pub name: String,
+    pub username: String,
 }
 
 // @TODO
@@ -40,9 +40,16 @@ impl RendezvousManager {
 
     // advertise presence to others using relevant implementation (by order of preference)
     pub async fn advertise_manage() -> Result<(), Box<dyn Error>> {
+        Self::advertise_manage_with_username("CargoDrop").await
+    }
+
+    // advertise presence to others using relevant implementation and preferred username.
+    pub async fn advertise_manage_with_username(username: &str) -> Result<(), Box<dyn Error>> {
         match Self::RENDEZVOUS_IMPL {
             RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise().await,
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise().await,
+            RendezvousImpl::Bluetooth => {
+                ble_rendezvous::BleRendezvous::advertise_with_username(username).await
+            }
         }
     }
 }
