@@ -2,8 +2,6 @@ pub mod ble_rendezvous;
 pub mod lan_rendezvous;
 
 use std::error::Error;
-use uuid::Uuid;
-use btleplug::api::PeripheralProperties;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Peer {
@@ -30,11 +28,7 @@ impl RendezvousManager {
     // The current rendezvous implementation in use.
     pub const RENDEZVOUS_IMPL: RendezvousImpl = RendezvousImpl::Bluetooth;
 
-    // A filter function that evaluates peripheral properties to check if it advertises a the app UUID
-    fn is_matching_uuid(properties: &btleplug::api::PeripheralProperties) -> bool {
-        let target_uuid = Uuid::parse_str(Self::APP_SERVICE_UUID).unwrap_or_default();
-        properties.services.contains(&target_uuid)
-    }
+
 
     // discover devices using relevant implementation (by order of preference)
     pub async fn discover_manage() -> Result<(), Box<dyn Error>> {
