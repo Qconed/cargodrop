@@ -12,6 +12,8 @@ use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 use uuid::Uuid;
 
+use super::{APP_SERVICE_UUID, MAX_RAW_PAYLOAD_BYTES, USERNAME_OFFSET};
+
 #[derive(Debug, Clone, Copy)]
 struct AdvertiseConfig {
     adapter_power_poll: Duration,
@@ -29,12 +31,36 @@ impl Default for AdvertiseConfig {
     }
 }
 
-/// Encodes the IPv4 and Port into a 6-byte array, then encodes it into Base64
-/// to be compactly used as the BLE device name of the advertising packet.
-fn encode_network_info_to_name(ipv4: [u8; 4], port: u16) -> String {
-    let mut bytes = [0u8; 6];
-    bytes[0..4].copy_from_slice(&ipv4);
-    bytes[4..6].copy_from_slice(&port.to_be_bytes()); // Network byte order
+fn max_username_payload_bytes() -> usize {
+    MAX_RAW_PAYLOAD_BYTES - USERNAME_OFFSET
+}
+
+fn truncate_username_for_payload(username: &str) -> String {
+    let max_bytes = max_username_payload_bytes();
+    if username.len() <= max_bytes {
+        return username.to_string();
+    }
+
+    let mut end = max_bytes;
+    while !username.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    username[..end].to_string()
+}
+
+/// Encodes IPv4, port and username into a compact raw payload and then Base64.
+/// Layout: [4 bytes IPv4][2 bytes port][1 byte username_len][N bytes username].
+fn encode_network_info_to_name(ipv4: [u8; 4], port: u16, username: &str) -> String {
+    let truncated = truncate_username_for_payload(username);
+    let username_bytes = truncated.as_bytes();
+
+    let mut bytes = Vec::with_capacity(USERNAME_OFFSET + username_bytes.len());
+    bytes.extend_from_slice(&ipv4);
+    bytes.extend_from_slice(&port.to_be_bytes());
+    bytes.push(username_bytes.len() as u8);
+    bytes.extend_from_slice(username_bytes);
+
     URL_SAFE_NO_PAD.encode(bytes)
 }
 
@@ -92,16 +118,22 @@ fn get_local_network_info() -> ([u8; 4], u16) {
     ([192, 168, 1, 100], 8080)
 }
 
-fn build_advertisement_payload() -> ([u8; 4], u16, String) {
+fn get_local_username() -> &'static str {
+    "cargo-user"
+}
+
+fn build_advertisement_payload() -> ([u8; 4], u16, String, String) {
     let (ip, port) = get_local_network_info();
-    let device_name_payload = encode_network_info_to_name(ip, port);
+    let username = get_local_username();
+    let truncated_username = truncate_username_for_payload(username);
+    let device_name_payload = encode_network_info_to_name(ip, port, &truncated_username);
 
     println!(
-        "Encoded Network payload (IP: {:?}, Port: {}) -> Name: '{}'",
-        ip, port, device_name_payload
+        "Encoded rendezvous payload (IP: {}.{}.{}.{}, Port: {}, Username: '{}') -> Name: '{}'",
+        ip[0], ip[1], ip[2], ip[3], port, truncated_username, device_name_payload
     );
 
-    (ip, port, device_name_payload)
+    (ip, port, truncated_username, device_name_payload)
 }
 
 async fn start_advertising(
@@ -116,23 +148,24 @@ async fn start_advertising(
     Ok(())
 }
 
-fn log_heartbeat(ip: [u8; 4], port: u16, device_name_payload: &str) {
+fn log_heartbeat(ip: [u8; 4], port: u16, username: &str, device_name_payload: &str) {
     let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
     println!("[{}] --- ADVERTISING ACTIVE ---", time_str);
     println!(
-        "  Broadcasting IP: {:?}, Port: {} inside Base64 Name: '{}'",
-        ip, port, device_name_payload
+        "  Broadcasting Username: '{}', IP: {}.{}.{}.{}, Port: {} inside Base64 Name: '{}'",
+        username, ip[0], ip[1], ip[2], ip[3], port, device_name_payload
     );
 }
 
 async fn run_advertise_heartbeat(
     ip: [u8; 4],
     port: u16,
+    username: &str,
     device_name_payload: &str,
     config: AdvertiseConfig,
 ) -> Result<(), Box<dyn Error>> {
     loop {
-        log_heartbeat(ip, port, device_name_payload);
+        log_heartbeat(ip, port, username, device_name_payload);
         sleep(config.heartbeat_interval).await;
     }
 }
@@ -140,10 +173,10 @@ async fn run_advertise_heartbeat(
 /// The main advertising loop that continuously advertises the custom network rendezvous payload.
 pub async fn advertise_rendezvous() -> Result<(), Box<dyn Error>> {
     let config = AdvertiseConfig::default();
-    let service_uuid = Uuid::parse_str(crate::ble::APP_SERVICE_UUID)?;
+    let service_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
 
     // 1. Prepare payload components
-    let (ip, port, device_name_payload) = build_advertisement_payload();
+    let (ip, port, username, device_name_payload) = build_advertisement_payload();
 
     // 2. Initialize BLE Peripheral & Service
     let mut peripheral = init_ble_peripheral(service_uuid).await?;
@@ -153,5 +186,5 @@ pub async fn advertise_rendezvous() -> Result<(), Box<dyn Error>> {
     start_advertising(&mut peripheral, service_uuid, &device_name_payload).await?;
 
     // 4. Keep process alive and expose liveness heartbeat.
-    run_advertise_heartbeat(ip, port, &device_name_payload, config).await
+    run_advertise_heartbeat(ip, port, &username, &device_name_payload, config).await
 }

@@ -7,7 +7,7 @@ use std::error::Error;
 pub struct Peer {
     pub ip: [u8; 4],
     pub port: u16,
-    pub name: String,
+    pub username: String,
 }
 
 // @TODO
@@ -22,9 +22,6 @@ pub enum RendezvousImpl {
 pub struct RendezvousManager;
 
 impl RendezvousManager {
-    // Uniquely generated UUID used to identify CargoDrop's BLE service.
-    pub const APP_SERVICE_UUID: &str = "d59218d6-6b22-4a0b-9ba7-70e28148b488";
-    
     // The current rendezvous implementation in use.
     pub const RENDEZVOUS_IMPL: RendezvousImpl = RendezvousImpl::Bluetooth;
 
