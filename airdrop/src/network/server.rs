@@ -42,7 +42,6 @@ impl Server {
             .parse()
             .map_err(|e: std::net::AddrParseError| AirdropError::Network(e.to_string()))?;
 
-        // ✅ Créer UdpSocket au lieu de passer SocketAddr
         let socket = std::net::UdpSocket::bind(addr)
             .map_err(|e| AirdropError::Network(e.to_string()))?;
         socket.set_nonblocking(true)
@@ -67,13 +66,13 @@ impl Server {
     async fn accept_connections(&self, endpoint: Endpoint) -> Result<()> {
         loop {
             if let Some(conn) = endpoint.accept().await {
-                println!("✅ New QUIC connection incoming");
+                println!(" New QUIC connection incoming");
 
                 let connections = Arc::clone(&self.active_connections);
 
                 tokio::spawn(async move {
                     if let Err(e) = Self::handle_connection(conn, connections).await {
-                        eprintln!("❌ Connection error: {}", e);
+                        eprintln!(" Connection error: {}", e);
                     }
                 });
             }
@@ -101,13 +100,13 @@ impl Server {
 
                             tokio::spawn(async move {
                                 if let Err(e) = Self::handle_stream(&mut send, &mut recv).await {
-                                    eprintln!("❌ Stream error: {}", e);
+                                    eprintln!(" Stream error: {}", e);
                                 }
                             });
                         }
                         Err(_) => {
-                            println!("❌ Connection closed: {}", addr);
-                            break; // ✅ Juste break, return Result n'est pas nécessaire
+                            println!(" Connection closed: {}", addr);
+                            break; 
                         }
                     }
                 }

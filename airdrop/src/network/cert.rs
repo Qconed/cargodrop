@@ -44,7 +44,7 @@ impl CertificateManager {
             return Err(AirdropError::Network("No private key found".to_string()));
         }
 
-        // ✅ Utiliser clone_key() au lieu de clone()
+        
         let key = rustls::pki_types::PrivateKeyDer::Pkcs8(keys[0].clone_key());
 
         Ok((cert_chain,key))

@@ -9,7 +9,7 @@ impl FileTransfer {
         let data = std::fs::read(path)
             .map_err(|e| crate::error::AirdropError::Transfer(e.to_string()))?;
         
-        println!("📤 File size: {} bytes", data.len());
+        println!("File size: {} bytes", data.len());
         Ok(data)
     }
 
@@ -17,7 +17,7 @@ impl FileTransfer {
         std::fs::write(path, data)
             .map_err(|e| crate::error::AirdropError::Transfer(e.to_string()))?;
         
-        println!("📥 File saved to {:?}", path);
+        println!(" File saved to {:?}", path);
         Ok(())
     }
 }

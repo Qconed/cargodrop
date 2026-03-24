@@ -18,7 +18,6 @@ impl Client {
         let addr = remote_device.socket_addr();
         println!("🔗 Connecting to {} via QUIC...", remote_device.name);
 
-        // Créer UdpSocket local au lieu de parser une string
         let socket = std::net::UdpSocket::bind("0.0.0.0:0")
             .map_err(|e| AirdropError::Network(e.to_string()))?;
         socket.set_nonblocking(true)

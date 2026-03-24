@@ -24,9 +24,9 @@ async fn main() -> airdrop::Result<()> {
     network.start().await?;
 
     // Garder l'application active
-    println!("⏳ Press Ctrl+C to exit...");
+    println!(" Press Ctrl+C to exit...");
     tokio::signal::ctrl_c().await?;
-    println!("👋 Shutting down...");
+    println!(" Shutting down...");
 
     Ok(())
 }

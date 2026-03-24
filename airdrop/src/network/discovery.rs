@@ -31,9 +31,8 @@ impl DiscoveryService {
             }
         };
 
-        // ✅ Format correct: instance._service._proto.local
         let service_info = ServiceInfo::new(
-            "_airdrop._tcp.local.",  // ✅ IMPORTANT: ends with .local.
+            "_airdrop._tcp.local.",  
             &self.local_device.name,
             "local",
             ip_addr,

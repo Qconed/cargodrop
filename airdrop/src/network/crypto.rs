@@ -9,7 +9,6 @@ impl CryptoManager {
         let mut secret_bytes = [0u8; 32];
         rand::thread_rng().fill(&mut secret_bytes);
         
-        // Clamp the secret key as per X25519 spec
         secret_bytes[0] &= 248;
         secret_bytes[31] &= 127;
         secret_bytes[31] |= 64;
