@@ -1,4 +1,3 @@
-mod ble;
 mod rendezvous;
 // use rendezvous::RendezvousManager;
 use std::env;
@@ -12,12 +11,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.len() > 1 && args[1] == "advertise" {
         println!("Starting CargoDrop in Advertiser Mode...");
         // Call our new decentralized advertising logic
-        // ble::advertise::advertise_app_service().await?;
         rendezvous::RendezvousManager::advertise_manage().await?;
     } else if args.len() > 1 && args[1] == "discover" {
         println!("Starting CargoDrop in Discovery Mode...");
         // Call our new decentralized discovery logic
-        // ble::discover::discover_app_peripherals().await?;
         rendezvous::RendezvousManager::discover_manage().await?;
     } else {
         // Provide usage instructions if no argument is given
