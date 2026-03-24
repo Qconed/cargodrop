@@ -4,10 +4,12 @@ pub mod client;
 pub mod crypto;
 pub mod protocol;
 pub mod cert;
+pub mod transfer;
 
 pub use discovery::DiscoveryService;
 pub use server::Server;
 pub use client::{Client, ClientConnection};
+pub use transfer::FileTransfer;
 pub use crypto::CryptoManager;
 pub use protocol::ProtocolHandler;
 
