@@ -1,0 +1,190 @@
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use ble_peripheral_rust::{
+    Peripheral, PeripheralImpl,
+    gatt::{
+        characteristic::Characteristic,
+        properties::{AttributePermission, CharacteristicProperty},
+        service::Service,
+    },
+};
+use std::error::Error;
+use tokio::sync::mpsc;
+use tokio::time::{Duration, sleep};
+use uuid::Uuid;
+
+use super::{APP_SERVICE_UUID, MAX_RAW_PAYLOAD_BYTES, USERNAME_OFFSET};
+
+#[derive(Debug, Clone, Copy)]
+struct AdvertiseConfig {
+    adapter_power_poll: Duration,
+    adapter_power_max_wait: Duration,
+    heartbeat_interval: Duration,
+}
+
+impl Default for AdvertiseConfig {
+    fn default() -> Self {
+        Self {
+            adapter_power_poll: Duration::from_millis(50),
+            adapter_power_max_wait: Duration::from_secs(60),
+            heartbeat_interval: Duration::from_secs(5),
+        }
+    }
+}
+
+fn max_username_payload_bytes() -> usize {
+    MAX_RAW_PAYLOAD_BYTES - USERNAME_OFFSET
+}
+
+fn truncate_username_for_payload(username: &str) -> String {
+    let max_bytes = max_username_payload_bytes();
+    if username.len() <= max_bytes {
+        return username.to_string();
+    }
+
+    let mut end = max_bytes;
+    while !username.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    username[..end].to_string()
+}
+
+/// Encodes IPv4, port and username into a compact raw payload and then Base64.
+/// Layout: [4 bytes IPv4][2 bytes port][1 byte username_len][N bytes username].
+fn encode_network_info_to_name(ipv4: [u8; 4], port: u16, username: &str) -> String {
+    let truncated = truncate_username_for_payload(username);
+    let username_bytes = truncated.as_bytes();
+
+    let mut bytes = Vec::with_capacity(USERNAME_OFFSET + username_bytes.len());
+    bytes.extend_from_slice(&ipv4);
+    bytes.extend_from_slice(&port.to_be_bytes());
+    bytes.push(username_bytes.len() as u8);
+    bytes.extend_from_slice(username_bytes);
+
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// Initializes the BLE peripheral and the GATT service, returning the configured Peripheral.
+async fn init_ble_peripheral(service_uuid: Uuid) -> Result<Peripheral, Box<dyn Error>> {
+    let (sender_tx, mut receiver_rx) = mpsc::channel(256);
+    let mut peripheral = Peripheral::new(sender_tx).await?;
+
+    // Consume the channel events in a background task so it doesn't block.
+    // For pure broadcasting, we don't care about interacting with clients via GATT requests.
+    tokio::spawn(async move {
+        while let Some(_event) = receiver_rx.recv().await {
+            // Just dropping the events
+        }
+    });
+
+    // Create a dummy service just to hold the primary app UUID.
+    let service = Service {
+        uuid: service_uuid,
+        primary: true,
+        characteristics: vec![Characteristic {
+            uuid: Uuid::new_v4(),
+            properties: vec![CharacteristicProperty::Read],
+            permissions: vec![AttributePermission::Readable],
+            ..Default::default()
+        }],
+    };
+
+    peripheral.add_service(&service).await?;
+    println!("GATT Service added locally.");
+
+    Ok(peripheral)
+}
+
+async fn wait_until_adapter_powered(
+    peripheral: &mut Peripheral,
+    config: AdvertiseConfig,
+) -> Result<(), Box<dyn Error>> {
+    println!("Ensuring Bluetooth adapter is powered on...");
+
+    let start = tokio::time::Instant::now();
+    while !peripheral.is_powered().await? {
+        if start.elapsed() >= config.adapter_power_max_wait {
+            return Err("Timed out waiting for Bluetooth adapter to be powered on".into());
+        }
+        sleep(config.adapter_power_poll).await;
+    }
+
+    Ok(())
+}
+
+/// Discovers the local network config (@todo: mocked here, should be injected or detected dynamically).
+fn get_local_network_info() -> ([u8; 4], u16) {
+    // Return sample local IPv4 and HTTP Port
+    ([192, 168, 1, 100], 8080)
+}
+
+fn get_local_username() -> &'static str {
+    "cargo-user"
+}
+
+fn build_advertisement_payload() -> ([u8; 4], u16, String, String) {
+    let (ip, port) = get_local_network_info();
+    let username = get_local_username();
+    let truncated_username = truncate_username_for_payload(username);
+    let device_name_payload = encode_network_info_to_name(ip, port, &truncated_username);
+
+    println!(
+        "Encoded rendezvous payload (IP: {}.{}.{}.{}, Port: {}, Username: '{}') -> Name: '{}'",
+        ip[0], ip[1], ip[2], ip[3], port, truncated_username, device_name_payload
+    );
+
+    (ip, port, truncated_username, device_name_payload)
+}
+
+async fn start_advertising(
+    peripheral: &mut Peripheral,
+    service_uuid: Uuid,
+    device_name_payload: &str,
+) -> Result<(), Box<dyn Error>> {
+    peripheral
+        .start_advertising(device_name_payload, &[service_uuid])
+        .await?;
+    println!("Now actively advertising custom network rendezvous info...");
+    Ok(())
+}
+
+fn log_heartbeat(ip: [u8; 4], port: u16, username: &str, device_name_payload: &str) {
+    let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
+    println!("[{}] --- ADVERTISING ACTIVE ---", time_str);
+    println!(
+        "  Broadcasting Username: '{}', IP: {}.{}.{}.{}, Port: {} inside Base64 Name: '{}'",
+        username, ip[0], ip[1], ip[2], ip[3], port, device_name_payload
+    );
+}
+
+async fn run_advertise_heartbeat(
+    ip: [u8; 4],
+    port: u16,
+    username: &str,
+    device_name_payload: &str,
+    config: AdvertiseConfig,
+) -> Result<(), Box<dyn Error>> {
+    loop {
+        log_heartbeat(ip, port, username, device_name_payload);
+        sleep(config.heartbeat_interval).await;
+    }
+}
+
+/// The main advertising loop that continuously advertises the custom network rendezvous payload.
+pub async fn advertise_rendezvous() -> Result<(), Box<dyn Error>> {
+    let config = AdvertiseConfig::default();
+    let service_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
+
+    // 1. Prepare payload components
+    let (ip, port, username, device_name_payload) = build_advertisement_payload();
+
+    // 2. Initialize BLE Peripheral & Service
+    let mut peripheral = init_ble_peripheral(service_uuid).await?;
+    wait_until_adapter_powered(&mut peripheral, config).await?;
+
+    // 3. Start continuously advertising
+    start_advertising(&mut peripheral, service_uuid, &device_name_payload).await?;
+
+    // 4. Keep process alive and expose liveness heartbeat.
+    run_advertise_heartbeat(ip, port, &username, &device_name_payload, config).await
+}
