@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use crate::rendezvous::RendezvousTrait;
+use crate::user_info::UserInfo;
 
 pub mod advertise;
 pub mod discover;
@@ -19,7 +20,9 @@ pub struct BleRendezvous {}
 impl RendezvousTrait for BleRendezvous {
     async fn advertise() -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting advertisement...");
-        advertise::advertise_rendezvous().await
+        let user = UserInfo::load().await?;
+        println!("Loaded user config: username='{}', port={}", user.username, user.port);
+        advertise::advertise_rendezvous(&user).await
     }
     
     async fn discover() -> Result<(), Box<dyn Error>> {
