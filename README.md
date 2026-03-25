@@ -1,28 +1,74 @@
-# cargodrop
-An airdrop application fully written in Rust for effiicency ! Enables file transfers to others close by, withouth the need of a Internet or Wifi connection between devices.
+# CargoDrop TCP Network Layer
 
+This repository now includes a TCP-based network layer for direct file transfer between two devices on the same LAN.
 
+## Features
 
+- Thread-safe receiver (`TcpServer`) with one thread per incoming connection
+- Sender client (`TcpClient`) for streaming files in chunks over TCP
+- JSON handshake with metadata before transfer starts
+- Progress reporting through `mpsc::channel`
+- Receiver saves files into `./received/`
 
+## Dependencies
 
-# Turning on bluetooth advertising and discovering raspberry pi
+```toml
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+```
 
-sudo bluetoothctl system-alias "RaspberryPi-CargoDrop"
-sudo bluetoothctl
-menu advertise
-name on
-back
-advertise on
+## Build
 
-then cargo run and raspberry will be detected.
+```bash
+cargo build
+```
 
-sudo bluetoothctl advertise off # to turn off advertising
+## Local Network Test (2 PCs)
 
-# Generating a Custom UUID
+### On the RECEIVER PC (example IP: 192.168.1.10)
 
-If you want to change the application's unique identifier (UUID) used for Bluetooth Service Discovery:
+```bash
+cargo run -- receive --port 5001
+```
 
-1. **Using Terminal**: Run `uuidgen` in your Linux/macOS terminal to generate a random 128-bit Version 4 UUID.
-2. **Programmatically**: Use the `uuid` Rust crate: `uuid::Uuid::new_v4().to_string()`.
+Expected behavior:
+- Starts TCP server on port `5001`
+- Waits for incoming connection
+- Saves incoming file under `./received/`
+- Prints progress logs such as:
 
-Once generated, replace the existing `APP_SERVICE_UUID` constant in `src/ble/mod.rs` with your new 128-bit UUID string.
+```text
+[1742895600] Receiving... 45% (2.30 MB / 5.10 MB)
+```
+
+### On the SENDER PC (example IP: 192.168.1.20)
+
+```bash
+cargo run -- send --ip 192.168.1.10 --port 5001 --file ./photo.jpg
+```
+
+Expected behavior:
+- Connects to receiver at `192.168.1.10:5001`
+- Sends handshake containing device name and file metadata
+- Streams file bytes in chunks of 4096 bytes
+- Prints progress logs such as:
+
+```text
+[1742895601] Sending... 72% (3.60 MB / 5.10 MB)
+```
+
+## CLI Usage
+
+```bash
+cargo run -- receive --port <PORT>
+cargo run -- send --ip <IP> --port <PORT> --file <FILE_PATH>
+```
+
+- `receive`: run in receiver mode
+- `send`: run in sender mode
+- `--port`: optional, default is `5001`
+- `--ip`: required for sender mode
+- `--file`: required for sender mode
+
+If invalid arguments are provided, the program prints a clear usage message and exits.

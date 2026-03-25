@@ -231,6 +231,8 @@ dependencies = [
  "chrono",
  "clap",
  "futures",
+ "serde",
+ "serde_json",
  "tokio",
  "uuid",
 ]

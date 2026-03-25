@@ -1,11 +1,16 @@
 mod rendezvous;
 mod cli;
 mod use_cases;
+mod network;
 
 use use_cases::AppUseCases;
 use cli::Cli;
 use clap::Parser;
 use std::error::Error;
+
+use network::file_transfer::PeerInfo;
+use network::tcp_client::TcpClient;
+use network::tcp_server::TcpServer;
 
 struct App;
 
@@ -19,17 +24,22 @@ impl AppUseCases for App {
         rendezvous::RendezvousManager::discover_manage().await
     }
 
-    async fn send(&self) -> Result<(), Box<dyn Error>> {
-        println!("Send logic not implemented yet.");
-        Ok(())
+    async fn send(&self, ip: String, port: u16, file_path: String) -> Result<(), Box<dyn Error>> {
+        let peer = PeerInfo { // @todo: this should be discovered in future versions
+            ip,
+            port,
+            device_name: "receiver".to_string(),
+        };
+
+        let client = TcpClient::new(peer, "DEFAULT_NAME".to_string());
+        client.send_file(&file_path)
     }
 
-    async fn receive(&self) -> Result<(), Box<dyn Error>> {
-        println!("Receive logic not implemented yet.");
-        Ok(())
+    async fn receive(&self, port: u16) -> Result<(), Box<dyn Error>> {
+        let server = TcpServer::new(port, "DEFAULT_NAME".to_string());
+        server.start()
     }
 }
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
