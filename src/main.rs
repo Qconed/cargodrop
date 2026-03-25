@@ -7,6 +7,7 @@ use use_cases::AppUseCases;
 use cli::Cli;
 use clap::Parser;
 use std::error::Error;
+use std::process;
 
 use network::file_transfer::PeerInfo;
 use network::tcp_client::TcpClient;
