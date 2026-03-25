@@ -11,15 +11,29 @@ pub struct Cli {
 }
 
 #[derive(Subcommand)]
-pub enum Commands {
+pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the documentation of the commands !!
     /// Start CargoDrop in Advertiser Mode
     Advertise,
     /// Start CargoDrop in Discovery Mode
     Discover,
-    /// Send a file (mockup)
-    Send,
-    /// Receive a file (mockup)
-    Receive,
+    /// Send a file
+    Send {
+        /// Receiver's IP address
+        #[arg(short, long)]
+        ip: String,
+        /// Receiver's port (default: 5001)
+        #[arg(short, long, default_value_t = 5001)]
+        port: u16,
+        /// Path to the file to send
+        #[arg(short, long)]
+        file: String,
+    },
+    /// Receive a file
+    Receive {
+        /// Port to listen on (default: 5001)
+        #[arg(short, long, default_value_t = 5001)]
+        port: u16,
+    },
 }
 
 /// The cli component uses dependency inversion of the App use cases to run
@@ -34,13 +48,13 @@ impl Cli {
                 println!("Starting CargoDrop in Discovery Mode...");
                 use_cases.discover().await?;
             }
-            Commands::Send => {
-                println!("Starting CargoDrop in Send Mode (Mockup)...");
-                use_cases.send().await?;
+            Commands::Send { ip, port, file } => {
+                println!("Starting CargoDrop in Send Mode...");
+                use_cases.send(ip, port, file).await?;
             }
-            Commands::Receive => {
-                println!("Starting CargoDrop in Receive Mode (Mockup)...");
-                use_cases.receive().await?;
+            Commands::Receive { port } => {
+                println!("Starting CargoDrop in Receive Mode...");
+                use_cases.receive(port).await?;
             }
         }
         Ok(())
