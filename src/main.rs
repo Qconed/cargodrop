@@ -1,48 +1,127 @@
-mod rendezvous;
-// use rendezvous::RendezvousManager;
 use std::env;
 use std::error::Error;
+use std::process;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    // Collect command line arguments to decide which mode to run in.
+mod network;
+
+use network::file_transfer::PeerInfo;
+use network::tcp_client::TcpClient;
+use network::tcp_server::TcpServer;
+
+fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() > 1 && args[1] == "advertise" {
-        println!("Starting CargoDrop in Advertiser Mode...");
-        // Call our new decentralized advertising logic
-        rendezvous::RendezvousManager::advertise_manage().await?;
-    } else if args.len() > 1 && args[1] == "discover" {
-        println!("Starting CargoDrop in Discovery Mode...");
-        // Call our new decentralized discovery logic
-        rendezvous::RendezvousManager::discover_manage().await?;
-    } else {
-        // Provide usage instructions if no argument is given
-        println!("Usage: cargo run -- [advertise|discover]");
-        println!("Attempting to run both concurrently for demonstration...");
+    if args.len() < 2 {
+        print_usage(&args[0]);
+        process::exit(1);
+    }
 
-        // tokio::spawn allows us to spin up an asynchronous task in the background.
-        // NOTE: Running both advertising and discovery simultaneously on the same
-        // physical Bluetooth adapter might fail or be completely ignored depending
-        // on the specific hardware controller's capabilities.
-        let advertiser = tokio::spawn(async {
-            if let Err(e) = rendezvous::RendezvousManager::advertise_manage().await {
-                eprintln!("Advertiser error: {}", e);
-            }
-        });
+    let result = match args[1].as_str() {
+        "receive" => run_receive_mode(&args),
+        "send" => run_send_mode(&args),
+        _ => {
+            print_usage(&args[0]);
+            process::exit(1);
+        }
+    };
 
-        // Give the advertiser a second to initialize properly before we start scanning
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-        let discoverer = tokio::spawn(async {
-            if let Err(e) = rendezvous::RendezvousManager::discover_manage().await {
-                eprintln!("Discoverer error: {}", e);
-            }
-        });
-
-        // tokio::join! waits for multiple futures (our spawned tasks) to complete.
-        let _ = tokio::join!(advertiser, discoverer);
+    if let Err(err) = result {
+        eprintln!("Error: {}", err);
+        print_usage(&args[0]);
+        process::exit(1);
     }
 
     Ok(())
+}
+
+fn run_receive_mode(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut port: u16 = 5001;
+    let mut index = 2;
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "--port" => {
+                index += 1;
+                if index >= args.len() {
+                    return Err("Missing value for --port".into());
+                }
+                port = args[index].parse()?;
+            }
+            _ => {
+                return Err(format!("Unknown argument for receive mode: {}", args[index]).into());
+            }
+        }
+        index += 1;
+    }
+
+    let device_name = resolve_device_name();
+    let server = TcpServer::new(port, device_name);
+    server.start()
+}
+
+fn run_send_mode(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let mut ip: Option<String> = None;
+    let mut file_path: Option<String> = None;
+    let mut port: u16 = 5001;
+
+    let mut index = 2;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--ip" => {
+                index += 1;
+                if index >= args.len() {
+                    return Err("Missing value for --ip".into());
+                }
+                ip = Some(args[index].clone());
+            }
+            "--port" => {
+                index += 1;
+                if index >= args.len() {
+                    return Err("Missing value for --port".into());
+                }
+                port = args[index].parse()?;
+            }
+            "--file" => {
+                index += 1;
+                if index >= args.len() {
+                    return Err("Missing value for --file".into());
+                }
+                file_path = Some(args[index].clone());
+            }
+            _ => {
+                return Err(format!("Unknown argument for send mode: {}", args[index]).into());
+            }
+        }
+        index += 1;
+    }
+
+    let ip = ip.ok_or("Missing required argument: --ip")?;
+    let file_path = file_path.ok_or("Missing required argument: --file")?;
+
+    let peer = PeerInfo {
+        ip,
+        port,
+        device_name: "receiver".to_string(),
+    };
+
+    let client = TcpClient::new(peer, resolve_device_name());
+    client.send_file(&file_path)
+}
+
+fn resolve_device_name() -> String {
+    env::var("HOSTNAME").unwrap_or_else(|_| "unknown-device".to_string())
+}
+
+fn print_usage(bin: &str) {
+    println!("Usage:");
+    println!("  {} receive --port <PORT>", bin);
+    println!("  {} send --ip <IP> --port <PORT> --file <FILE_PATH>", bin);
+    println!();
+    println!("Subcommands:");
+    println!("  receive   Run in receiver mode");
+    println!("    --port <PORT>         Port to listen on (default: 5001)");
+    println!("  send      Run in sender mode");
+    println!("    --ip <IP>             Receiver's IP address");
+    println!("    --port <PORT>         Receiver's port (default: 5001)");
+    println!("    --file <FILE_PATH>    Path to the file to send");
 }

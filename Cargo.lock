@@ -180,6 +180,8 @@ dependencies = [
  "btleplug",
  "chrono",
  "futures",
+ "serde",
+ "serde_json",
  "tokio",
  "uuid",
 ]
