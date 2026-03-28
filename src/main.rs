@@ -2,12 +2,13 @@ mod rendezvous;
 mod cli;
 mod use_cases;
 mod network;
+mod user_info;
 
 use use_cases::AppUseCases;
 use cli::Cli;
 use clap::Parser;
 use std::error::Error;
-use std::process;
+use user_info::UserInfo;
 
 use network::file_transfer::PeerInfo;
 use network::tcp_client::TcpClient;
@@ -40,7 +41,67 @@ impl AppUseCases for App {
         let server = TcpServer::new(port, "DEFAULT_NAME".to_string());
         server.start()
     }
+
+    // User info use cases
+    async fn get_ip(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        println!("Local IP: {}", user.local_ip);
+        Ok(())
+    }
+
+    async fn get_name(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        println!("Username: {}", user.username);
+        Ok(())
+    }
+
+    async fn set_name(&self, name: String) -> Result<(), Box<dyn Error>> {
+        let mut user = UserInfo::load().await?;
+        user.set_username(name).await?;
+        println!("Username changed to: {}", user.username);
+        Ok(())
+    }
+
+    async fn set_name_default(&self) -> Result<(), Box<dyn Error>> {
+        let hostname = hostname::get()
+            .ok()
+            .and_then(|h| h.into_string().ok())
+            .unwrap_or_else(|| "cargo-user".to_string());
+        
+        let mut user = UserInfo::load().await?;
+        user.set_username(hostname.clone()).await?;
+        println!("Username reset to hostname: {}", user.username);
+        Ok(())
+    }
+
+    async fn get_port(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        println!("Port: {}", user.port);
+        Ok(())
+    }
+
+    async fn set_port(&self, port: u16) -> Result<(), Box<dyn Error>> {
+        let mut user = UserInfo::load().await?;
+        user.set_port(port).await?;
+        println!("Port changed to: {}", port);
+        Ok(())
+    }
+
+    async fn set_port_default(&self) -> Result<(), Box<dyn Error>> {
+        const DEFAULT_PORT: u16 = 8080;
+        let mut user = UserInfo::load().await?;
+        user.set_port(DEFAULT_PORT).await?;
+        println!("Port reset to default: {}", DEFAULT_PORT);
+        Ok(())
+    }
+
+    async fn info(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        user.display();
+        Ok(())
+    }
 }
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();

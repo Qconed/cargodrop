@@ -13,4 +13,14 @@ pub trait AppUseCases {
     fn discover(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn send(&self, ip: String, port: u16, file_path: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn receive(&self, port: u16) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    
+    // User info management use cases
+    fn get_ip(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn get_name(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_name(&self, name: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_name_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn get_port(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_port(&self, port: u16) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_port_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn info(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
 }
