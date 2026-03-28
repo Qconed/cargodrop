@@ -7,7 +7,6 @@ mod user_info;
 use use_cases::AppUseCases;
 use cli::Cli;
 use clap::Parser;
-use std::env;
 use std::error::Error;
 use user_info::UserInfo;
 
@@ -42,73 +41,49 @@ impl AppUseCases for App {
         let server = TcpServer::new(port, "DEFAULT_NAME".to_string());
         server.start()
     }
-}
 
-/// Handle user info commands (getip, getname, setname, getport, setport, info)
-async fn handle_user_info_command(args: &[String]) -> Result<bool, Box<dyn Error>> {
-    if args.is_empty() {
-        return Ok(false);
+    // User info use cases
+    async fn get_ip(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        println!("Local IP: {}", user.local_ip);
+        Ok(())
     }
 
-    match args[0].as_str() {
-        "getip" => {
-            let user = UserInfo::load().await?;
-            println!("Local IP: {}", user.local_ip);
-            Ok(true)
-        }
-        "getname" => {
-            let user = UserInfo::load().await?;
-            println!("Username: {}", user.username);
-            Ok(true)
-        }
-        "setname" => {
-            if args.len() < 2 {
-                eprintln!("Usage: cargo run -- setname <username>");
-                return Err("Missing username argument".into());
-            }
-            let mut user = UserInfo::load().await?;
-            user.set_username(args[1].clone()).await?;
-            println!("Username changed to: {}", user.username);
-            Ok(true)
-        }
-        "getport" => {
-            let user = UserInfo::load().await?;
-            println!("Port: {}", user.port);
-            Ok(true)
-        }
-        "setport" => {
-            if args.len() < 2 {
-                eprintln!("Usage: cargo run -- setport <port>");
-                return Err("Missing port argument".into());
-            }
-            let port: u16 = args[1].parse()?;
-            let mut user = UserInfo::load().await?;
-            user.set_port(port).await?;
-            println!("Port changed to: {}", port);
-            Ok(true)
-        }
-        "info" => {
-            let user = UserInfo::load().await?;
-            user.display();
-            Ok(true)
-        }
-        _ => Ok(false), // Not a user info command
+    async fn get_name(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        println!("Username: {}", user.username);
+        Ok(())
+    }
+
+    async fn set_name(&self, name: String) -> Result<(), Box<dyn Error>> {
+        let mut user = UserInfo::load().await?;
+        user.set_username(name).await?;
+        println!("Username changed to: {}", user.username);
+        Ok(())
+    }
+
+    async fn get_port(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        println!("Port: {}", user.port);
+        Ok(())
+    }
+
+    async fn set_port(&self, port: u16) -> Result<(), Box<dyn Error>> {
+        let mut user = UserInfo::load().await?;
+        user.set_port(port).await?;
+        println!("Port changed to: {}", port);
+        Ok(())
+    }
+
+    async fn info(&self) -> Result<(), Box<dyn Error>> {
+        let user = UserInfo::load().await?;
+        user.display();
+        Ok(())
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-
-    // Check if it's a user info command (before clap parsing)
-    if args.len() > 1 {
-        let user_info_args = &args[1..];
-        if handle_user_info_command(user_info_args).await? {
-            return Ok(());
-        }
-    }
-
-    // Otherwise, use clap CLI for advertise/discover/send/receive commands
     let cli = Cli::parse();
     let app = App;
 

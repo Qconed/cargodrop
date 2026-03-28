@@ -11,6 +11,7 @@ pub struct Cli {
 }
 
 #[derive(Subcommand)]
+#[command(rename_all = "lowercase")]
 pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the documentation of the commands !!
     /// Start CargoDrop in Advertiser Mode
     Advertise,
@@ -34,6 +35,24 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         #[arg(short, long, default_value_t = 5001)]
         port: u16,
     },
+    /// Get local IP address
+    GetIp,
+    /// Get current username
+    GetName,
+    /// Set username (max 9 characters)
+    SetName {
+        /// The new username
+        name: String,
+    },
+    /// Get configured HTTP transfer port
+    GetPort,
+    /// Set HTTP transfer port
+    SetPort {
+        /// The new port number
+        port: u16,
+    },
+    /// Display all user configuration info
+    Info,
 }
 
 /// The cli component uses dependency inversion of the App use cases to run
@@ -55,6 +74,24 @@ impl Cli {
             Commands::Receive { port } => {
                 println!("Starting CargoDrop in Receive Mode...");
                 use_cases.receive(port).await?;
+            }
+            Commands::GetIp => {
+                use_cases.get_ip().await?;
+            }
+            Commands::GetName => {
+                use_cases.get_name().await?;
+            }
+            Commands::SetName { name } => {
+                use_cases.set_name(name).await?;
+            }
+            Commands::GetPort => {
+                use_cases.get_port().await?;
+            }
+            Commands::SetPort { port } => {
+                use_cases.set_port(port).await?;
+            }
+            Commands::Info => {
+                use_cases.info().await?;
             }
         }
         Ok(())
