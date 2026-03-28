@@ -10,7 +10,7 @@ impl RendezvousTrait for LanRendezvous {
         Ok(())
     }
     
-    async fn discover() -> Result<(), Box<dyn Error>> {
+    async fn discover(_peers: crate::rendezvous::PeerMap) -> Result<(), Box<dyn Error>> {
         println!("LAN Rendezvous: Starting discovery ...");
         Ok(())
     }

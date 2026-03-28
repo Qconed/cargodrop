@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
 pub mod ble_rendezvous;
 pub mod lan_rendezvous;
 
@@ -9,6 +13,8 @@ pub struct Peer {
     pub port: u16,
     pub username: String,
 }
+
+pub type PeerMap = Arc<RwLock<HashMap<String, Peer>>>;
 
 // @TODO
 // The RendezVousManager will be in charge of handling the multiple "P2P" discovery means, and will enable switching between implementations
@@ -25,13 +31,11 @@ impl RendezvousManager {
     // The current rendezvous implementation in use.
     pub const RENDEZVOUS_IMPL: RendezvousImpl = RendezvousImpl::Bluetooth;
 
-
-
     // discover devices using relevant implementation (by order of preference)
-    pub async fn discover_manage() -> Result<(), Box<dyn Error>> {
+    pub async fn discover_manage(peers: PeerMap) -> Result<(), Box<dyn Error>> {
         match Self::RENDEZVOUS_IMPL {
-            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::discover().await,
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::discover().await,
+            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::discover(peers).await,
+            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::discover(peers).await,
         }
     }
 
@@ -46,6 +50,6 @@ impl RendezvousManager {
 
 // traits defining a rendezvous engine (allowing for discovery and advertising)
 pub trait RendezvousTrait {
-    async fn discover() -> Result<(), Box<dyn Error>>;
+    async fn discover(peers: PeerMap) -> Result<(), Box<dyn Error>>;
     async fn advertise() -> Result<(), Box<dyn Error>>;
 }

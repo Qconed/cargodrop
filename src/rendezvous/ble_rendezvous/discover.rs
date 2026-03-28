@@ -25,9 +25,7 @@ async fn setup_bluetooth_adapter() -> Result<Adapter, Box<dyn Error>> {
     Ok(adapter)
 }
 
-fn format_ip(ip: [u8; 4]) -> String {
-    format!("{}.{}.{}.{}", ip[0], ip[1], ip[2], ip[3])
-}
+
 
 /// Decodes the URL-safe Base64 payload into (IPv4, port, username).
 /// Layout: [4 bytes IPv4][2 bytes port][1 byte username_len][N bytes username].
@@ -87,7 +85,7 @@ async fn filter_and_parse_peripheral(
 }
 
 /// Main entrypoint loop to continuously stream and discover peers instantaneously.
-pub async fn discover_rendezvous() -> Result<(), Box<dyn Error>> {
+pub async fn discover_rendezvous(peers: crate::rendezvous::PeerMap) -> Result<(), Box<dyn Error>> {
     let target_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
 
     println!("Initializing Bluetooth Discovery Adapter...");
@@ -107,8 +105,8 @@ pub async fn discover_rendezvous() -> Result<(), Box<dyn Error>> {
     // Track when the app started to filter out initial "ghost" OS cache dumps
     let app_start_time = tokio::time::Instant::now();
 
-    // Store active peers (Key: encoded payload, Value: (Peer, Last Seen Timestamp))
-    let mut active_peers: std::collections::HashMap<String, (Peer, tokio::time::Instant)> =
+    // Key: encoded payload, Value: Last Seen Timestamp
+    let mut heartbeats: std::collections::HashMap<String, tokio::time::Instant> =
         std::collections::HashMap::new();
 
     // Create an interval timer that ticks every 5 seconds to run our "Device Lost" disconnect logic
@@ -134,20 +132,15 @@ pub async fn discover_rendezvous() -> Result<(), Box<dyn Error>> {
                         if let Ok(peripheral) = adapter.peripheral(id).await {
                             if let Some((payload_key, peer)) = filter_and_parse_peripheral(&peripheral, target_uuid).await {
                                 let now = tokio::time::Instant::now();
-                                let peer_ip = format_ip(peer.ip);
                                 
-                                // Only print if this is a brand new peer we haven't seen yet
-                                // if !active_peers.contains_key(&payload_key) {
-                                    let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
-                                    println!("[{}] --- PEER DETECTED ---", time_str);
-                                    println!(
-                                        "  + Username: '{}', IP: {}, Port: {}",
-                                        peer.username, peer_ip, peer.port
-                                    );
-                                // }
+                                // Update shared state
+                                {
+                                    let mut peers_write = peers.write().await;
+                                    peers_write.insert(payload_key.clone(), peer);
+                                }
                                 
                                 // Insert or update the heartbeat timer
-                                active_peers.insert(payload_key, (peer, now));
+                                heartbeats.insert(payload_key, now);
                             }
                         }
                     }
@@ -157,20 +150,26 @@ pub async fn discover_rendezvous() -> Result<(), Box<dyn Error>> {
 
             _ = cleanup_interval.tick() => {
                 let now = tokio::time::Instant::now();
-                active_peers.retain(|name, (peer, last_seen)| {
+                
+                // Track keys to remove from shared map
+                let mut to_remove = Vec::new();
+                
+                heartbeats.retain(|name, last_seen| {
                     if now.duration_since(*last_seen).as_secs() > 20 {
-                        let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
-                        let peer_ip = format_ip(peer.ip);
-                        println!("[{}] --- PEER LOST ---", time_str);
-                        println!(
-                            "  - Username: '{}', IP: {}, Port: {} went offline (payload='{}').",
-                            peer.username, peer_ip, peer.port, name
-                        );
+                        to_remove.push(name.clone());
                         false // Drop from HashMap
                     } else {
                         true // Keep in HashMap
                     }
                 });
+                
+                // Update shared state
+                if !to_remove.is_empty() {
+                    let mut peers_write = peers.write().await;
+                    for name in to_remove {
+                        peers_write.remove(&name);
+                    }
+                }
             }
         }
     }
