@@ -62,6 +62,18 @@ impl AppUseCases for App {
         Ok(())
     }
 
+    async fn set_name_default(&self) -> Result<(), Box<dyn Error>> {
+        let hostname = hostname::get()
+            .ok()
+            .and_then(|h| h.into_string().ok())
+            .unwrap_or_else(|| "cargo-user".to_string());
+        
+        let mut user = UserInfo::load().await?;
+        user.set_username(hostname.clone()).await?;
+        println!("Username reset to hostname: {}", user.username);
+        Ok(())
+    }
+
     async fn get_port(&self) -> Result<(), Box<dyn Error>> {
         let user = UserInfo::load().await?;
         println!("Port: {}", user.port);

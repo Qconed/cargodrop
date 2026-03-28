@@ -42,7 +42,11 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
     /// Set username (max 9 characters)
     SetName {
         /// The new username
-        name: String,
+        #[arg(value_name = "NAME")]
+        name: Option<String>,
+        /// Reset to system hostname
+        #[arg(long)]
+        default: bool,
     },
     /// Get configured HTTP transfer port
     GetPort,
@@ -81,8 +85,14 @@ impl Cli {
             Commands::GetName => {
                 use_cases.get_name().await?;
             }
-            Commands::SetName { name } => {
-                use_cases.set_name(name).await?;
+            Commands::SetName { name, default } => {
+                if default {
+                    use_cases.set_name_default().await?;
+                } else if let Some(n) = name {
+                    use_cases.set_name(n).await?;
+                } else {
+                    return Err("Usage: cargodrop set-name <NAME> or set-name --default".into());
+                }
             }
             Commands::GetPort => {
                 use_cases.get_port().await?;

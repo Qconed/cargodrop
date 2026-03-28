@@ -18,6 +18,7 @@ pub trait AppUseCases {
     fn get_ip(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn get_name(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn set_name(&self, name: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_name_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn get_port(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn set_port(&self, port: u16) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn info(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
