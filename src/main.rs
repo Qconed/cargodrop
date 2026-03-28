@@ -87,6 +87,14 @@ impl AppUseCases for App {
         Ok(())
     }
 
+    async fn set_port_default(&self) -> Result<(), Box<dyn Error>> {
+        const DEFAULT_PORT: u16 = 8080;
+        let mut user = UserInfo::load().await?;
+        user.set_port(DEFAULT_PORT).await?;
+        println!("Port reset to default: {}", DEFAULT_PORT);
+        Ok(())
+    }
+
     async fn info(&self) -> Result<(), Box<dyn Error>> {
         let user = UserInfo::load().await?;
         user.display();

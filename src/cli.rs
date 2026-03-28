@@ -53,7 +53,11 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
     /// Set HTTP transfer port
     SetPort {
         /// The new port number
-        port: u16,
+        #[arg(value_name = "PORT")]
+        port: Option<u16>,
+        /// Reset to default port (8080)
+        #[arg(long)]
+        default: bool,
     },
     /// Display all user configuration info
     Info,
@@ -97,8 +101,14 @@ impl Cli {
             Commands::GetPort => {
                 use_cases.get_port().await?;
             }
-            Commands::SetPort { port } => {
-                use_cases.set_port(port).await?;
+            Commands::SetPort { port, default } => {
+                if default {
+                    use_cases.set_port_default().await?;
+                } else if let Some(p) = port {
+                    use_cases.set_port(p).await?;
+                } else {
+                    return Err("Usage: cargodrop set-port <PORT> or set-port --default".into());
+                }
             }
             Commands::Info => {
                 use_cases.info().await?;

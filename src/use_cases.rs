@@ -21,5 +21,6 @@ pub trait AppUseCases {
     fn set_name_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn get_port(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn set_port(&self, port: u16) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_port_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn info(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
 }
