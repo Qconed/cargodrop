@@ -34,6 +34,12 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         #[arg(short, long, default_value_t = 5001)]
         port: u16,
     },
+    /// Send a file interactively (trigger a discovery, and choose to whom to send)
+    Sendinter {
+        /// Path to the file to send
+        #[arg(short, long)]
+        file: String,
+    },
 }
 
 /// The cli component uses dependency inversion of the App use cases to run
@@ -55,6 +61,18 @@ impl Cli {
             Commands::Receive { port } => {
                 println!("Starting CargoDrop in Receive Mode...");
                 use_cases.receive(port).await?;
+            }
+            Commands::Sendinter { file } => {
+                // here in the cli for the sendinter, discovery is done as a one off thing
+                // but for the GUI, this discovery will probably be a background task
+                println!("Starting CargoDrop in Interactive Send Mode...");
+                println!("Running discovery for 20 seconds...");
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(20),
+                    use_cases.discover()
+                ).await;
+                
+                use_cases.interactive_send(file).await?;
             }
         }
         Ok(())
