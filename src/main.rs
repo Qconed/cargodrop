@@ -61,6 +61,26 @@ impl AppUseCases for App {
         let server = TcpServer::new(port, "DEFAULT_NAME".to_string());
         server.start()
     }
+
+    async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
+        let peer_infos: Vec<PeerInfo> = {
+            let peers_guard = self.peers.read().await;
+            peers_guard.values().map(|p| PeerInfo {
+                ip: format!("{}.{}.{}.{}", p.ip[0], p.ip[1], p.ip[2], p.ip[3]),
+                port: p.port,
+                device_name: p.username.clone(),
+            }).collect()
+        };
+
+        // once peer have been searched, called the UI handler to select a peer
+        // behavior will be different if handler = CLI, or GUI, but it will still produce the same result
+        if let Some(selected_peer) = self.handler.select_peer(&peer_infos) {
+            self.send(selected_peer.ip, selected_peer.port, file_path).await
+        } else {
+            println!("No peer selected or operation cancelled.");
+            Ok(())
+        }
+    }
 }
 
 #[tokio::main]
