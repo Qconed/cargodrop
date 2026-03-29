@@ -11,6 +11,7 @@ use std::error::Error;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 use uuid::Uuid;
+use crate::user_info::UserInfo;
 
 use super::{APP_SERVICE_UUID, MAX_RAW_PAYLOAD_BYTES, USERNAME_OFFSET};
 
@@ -112,20 +113,19 @@ async fn wait_until_adapter_powered(
     Ok(())
 }
 
-/// Discovers the local network config (@todo: mocked here, should be injected or detected dynamically).
-fn get_local_network_info() -> ([u8; 4], u16) {
-    // Return sample local IPv4 and HTTP Port
-    ([192, 168, 1, 100], 8080)
+/// Discovers the local network config from UserInfo.
+fn get_local_network_info(user: &UserInfo) -> ([u8; 4], u16) {
+    (user.get_ip_bytes(), user.port)
 }
 
-fn get_local_username() -> &'static str {
-    "cargo-user"
+fn get_local_username(user: &UserInfo) -> String {
+    user.username.clone()
 }
 
-fn build_advertisement_payload() -> ([u8; 4], u16, String, String) {
-    let (ip, port) = get_local_network_info();
-    let username = get_local_username();
-    let truncated_username = truncate_username_for_payload(username);
+fn build_advertisement_payload(user: &UserInfo) -> ([u8; 4], u16, String, String) {
+    let (ip, port) = get_local_network_info(user);
+    let username = get_local_username(user);
+    let truncated_username = truncate_username_for_payload(&username);
     let device_name_payload = encode_network_info_to_name(ip, port, &truncated_username);
 
     println!(
@@ -171,12 +171,12 @@ async fn run_advertise_heartbeat(
 }
 
 /// The main advertising loop that continuously advertises the custom network rendezvous payload.
-pub async fn advertise_rendezvous() -> Result<(), Box<dyn Error>> {
+pub async fn advertise_rendezvous(user: &UserInfo) -> Result<(), Box<dyn Error>> {
     let config = AdvertiseConfig::default();
     let service_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
 
-    // 1. Prepare payload components
-    let (ip, port, username, device_name_payload) = build_advertisement_payload();
+    // 1. Prepare payload components from UserInfo
+    let (ip, port, username, device_name_payload) = build_advertisement_payload(user);
 
     // 2. Initialize BLE Peripheral & Service
     let mut peripheral = init_ble_peripheral(service_uuid).await?;
