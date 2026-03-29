@@ -24,6 +24,7 @@ impl RendezvousTrait for BleRendezvous {
     
     async fn discover(peers: crate::rendezvous::PeerMap) -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting discovery...");
-        discover::discover_rendezvous(peers).await
+        let service = discover::BleDiscoveryService::new(peers);
+        service.run().await
     }
 }
