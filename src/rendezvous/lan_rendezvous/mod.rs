@@ -1,6 +1,7 @@
 use std::error::Error;
-
-use crate::rendezvous::RendezvousTrait;
+use std::sync::Arc;
+use crate::rendezvous::{PeerMap, RendezvousTrait};
+use crate::ui::interaction::InteractionHandler;
 
 pub struct LanRendezvous {}
 
@@ -10,7 +11,7 @@ impl RendezvousTrait for LanRendezvous {
         Ok(())
     }
     
-    async fn discover(_peers: crate::rendezvous::PeerMap) -> Result<(), Box<dyn Error>> {
+    async fn discover(_peers: PeerMap, _handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
         println!("LAN Rendezvous: Starting discovery ...");
         Ok(())
     }

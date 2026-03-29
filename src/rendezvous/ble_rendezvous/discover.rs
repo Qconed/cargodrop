@@ -8,22 +8,33 @@ use crate::rendezvous::Peer;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use futures::stream::StreamExt;
 use uuid::Uuid;
+use std::sync::Arc;
+use crate::ui::interaction::InteractionHandler;
 
 use super::{APP_SERVICE_UUID, USERNAME_LEN_OFFSET, USERNAME_OFFSET};
 
 
 pub struct BleDiscoveryService {
     peers: crate::rendezvous::PeerMap,
+    handler: Arc<dyn InteractionHandler>,
 }
 
 impl BleDiscoveryService {
-    pub fn new(peers: crate::rendezvous::PeerMap) -> Self {
-        Self { peers }
+    pub fn new(peers: crate::rendezvous::PeerMap, handler: Arc<dyn InteractionHandler>) -> Self {
+        Self { peers, handler }
     }
 
     /// Entry point for the discovery service.
     pub async fn run(&self) -> Result<(), Box<dyn Error>> {
         let adapter = self.setup_adapter().await?;
+        
+        // Spawn the monitoring task
+        let peers_monitor = self.peers.clone();
+        let handler_monitor = self.handler.clone();
+        tokio::spawn(async move {
+            Self::monitor_peers(peers_monitor, handler_monitor).await;
+        });
+
         self.stream_events(adapter).await
     }
 
@@ -69,6 +80,38 @@ fn decode_network_info_from_name(name: &str) -> Option<([u8; 4], u16, String)> {
 }
 
 impl BleDiscoveryService {
+    /// display the detected peers list whenever a detection/disconnection happens
+    async fn monitor_peers(peers: crate::rendezvous::PeerMap, handler: Arc<dyn InteractionHandler>) {
+        let mut last_peers: std::collections::HashMap<String, crate::rendezvous::Peer> = std::collections::HashMap::new();
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            let p = peers.read().await;
+            
+            if p.len() != last_peers.len() {
+                let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
+                
+                // Identify new peers
+                for (key, peer) in p.iter() {
+                    if !last_peers.contains_key(key) {
+                        handler.handle_peer_event(crate::ui::interaction::PeerEvent::NewPeer(peer.clone(), time_str.clone()));
+                    }
+                }
+                
+                // Identify lost peers
+                for (key, peer) in last_peers.iter() {
+                    if !p.contains_key(key) {
+                        handler.handle_peer_event(crate::ui::interaction::PeerEvent::PeerLost(peer.clone(), time_str.clone()));
+                    }
+                }
+
+                // Display the current snapshot of all active peers using the UI handler
+                handler.display_peers_list(&*p);
+                
+                last_peers = p.clone();
+            }
+        }
+    }
+
     async fn stream_events(&self, adapter: Adapter) -> Result<(), Box<dyn Error>> {
         let target_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
 

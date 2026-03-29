@@ -5,6 +5,8 @@ use tokio::sync::RwLock;
 pub mod ble_rendezvous;
 pub mod lan_rendezvous;
 
+use crate::ui::interaction::InteractionHandler;
+
 use std::error::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,10 +34,10 @@ impl RendezvousManager {
     pub const RENDEZVOUS_IMPL: RendezvousImpl = RendezvousImpl::Bluetooth;
 
     // discover devices using relevant implementation (by order of preference)
-    pub async fn discover_manage(peers: PeerMap) -> Result<(), Box<dyn Error>> {
+    pub async fn discover_manage(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
         match Self::RENDEZVOUS_IMPL {
-            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::discover(peers).await,
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::discover(peers).await,
+            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::discover(peers, handler).await,
+            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::discover(peers, handler).await,
         }
     }
 
@@ -50,6 +52,6 @@ impl RendezvousManager {
 
 // traits defining a rendezvous engine (allowing for discovery and advertising)
 pub trait RendezvousTrait {
-    async fn discover(peers: PeerMap) -> Result<(), Box<dyn Error>>;
+    async fn discover(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>>;
     async fn advertise() -> Result<(), Box<dyn Error>>;
 }

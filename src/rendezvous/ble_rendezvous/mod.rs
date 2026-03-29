@@ -1,6 +1,7 @@
 use std::error::Error;
-
-use crate::rendezvous::RendezvousTrait;
+use std::sync::Arc;
+use crate::rendezvous::{PeerMap, RendezvousTrait};
+use crate::ui::interaction::InteractionHandler;
 
 pub mod advertise;
 pub mod discover;
@@ -22,9 +23,9 @@ impl RendezvousTrait for BleRendezvous {
         advertise::advertise_rendezvous().await
     }
     
-    async fn discover(peers: crate::rendezvous::PeerMap) -> Result<(), Box<dyn Error>> {
+    async fn discover(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting discovery...");
-        let service = discover::BleDiscoveryService::new(peers);
+        let service = discover::BleDiscoveryService::new(peers, handler);
         service.run().await
     }
 }
