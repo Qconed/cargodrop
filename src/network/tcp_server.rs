@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{self, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
 use std::thread;
@@ -69,12 +69,28 @@ impl TcpServer {
             FileTransfer::human_bytes(request.file_header.file_size)
         );
 
+        let accepted = Self::confirm_transfer(&request)?;
+
         let response = TransferResponse {
             device_name,
-            accepted: true,
-            message: "Ready to receive".to_string(),
+            accepted,
+            message: if accepted {
+                "Ready to receive".to_string()
+            } else {
+                "Transfer rejected by user".to_string()
+            },
         };
         FileTransfer::send_json_message(&mut stream, &response)?;
+
+        if !accepted {
+            println!(
+                "[{}] Transfer refused for '{}' from '{}'.",
+                FileTransfer::timestamp(),
+                request.file_header.filename,
+                request.device_name
+            );
+            return Ok(());
+        }
 
         std::fs::create_dir_all("received")?;
         let output_path = format!("received/{}", request.file_header.filename);
@@ -114,5 +130,25 @@ impl TcpServer {
         );
 
         Ok(())
+    }
+
+    fn confirm_transfer(request: &TransferRequest) -> Result<bool, Box<dyn Error>> {
+        println!();
+        println!("Incoming file transfer request:");
+        println!("  Sender: {}", request.device_name);
+        println!("  File: {}", request.file_header.filename);
+        println!(
+            "  Size: {}",
+            FileTransfer::human_bytes(request.file_header.file_size)
+        );
+        println!("Accept transfer? [y/N]");
+        print!("> ");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let choice = input.trim().to_ascii_lowercase();
+
+        Ok(matches!(choice.as_str(), "y" | "yes"))
     }
 }
