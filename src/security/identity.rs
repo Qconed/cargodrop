@@ -1,4 +1,44 @@
-// src/security/identity.rs
+//! Gestion de l'Identité Cryptographique
+//!
+//! Ce module gère la création, le stockage et la vérification des identités locales
+//! de chaque pair. Chaque identité est composée d'une paire de clés ED25519 et
+//! d'une empreinte digitale SHA256 qui permet l'authentification mutuelle.
+//!
+//! # Composants:
+//! - **GestionnaireIdentite**: Gère les clés ED25519 locales
+//! - **IdentitePair**: Représente l'identité publique d'un pair
+//!
+//! # Responsabilités:
+//! - **Génération**: Crée une nouvelle paire ED25519 aléatoire au démarrage
+//! - **Signatures**: Signe les données pour authentifier les messages
+//! - **Vérification**: Valide les signatures d'autres pairs
+//! - **Empreinte**: Génère une empreinte SHA256 (16 caractères = 64 bits)
+//! - **Persistance**: Charge/sauvegarde les clés du disque
+//!
+//! # ED25519:
+//! - Algorithme: Signature numérique Edwards Curve 25519
+//! - Taille clé: 32 bytes (256 bits)
+//! - Sécurité: 128 bits équivalents (très sûr)
+//! - Vitesse: Rapide, même pour gros volumes
+//!
+//! # Empreinte Digitale:
+//! - Calcul: SHA256(clé_publique)[..16]
+//! - Format: 16 caractères hexadécimaux = 64 bits
+//! - Affichage: Affiché à l'utilisateur pour vérification manuelle
+//! - Exemple: "a85d75dc55641f63"
+//!
+//! # Flux d'Authentification:
+//! 1. Chaque pair génère sa paire ED25519
+//! 2. Pair A affiche son empreinte: "a85d75dc55641f63"
+//! 3. Pair B affiche son empreinte: "d1e63e9478885ef0"
+//! 4. Les empreintes sont vérifiées out-of-band (en personne)
+//! 5. Les signatures authentifient tous les messages futurs
+//!
+//! # Sécurité:
+//! -Génération aléatoire sécurisée (rand crate)
+//! -Signature déterministe (reproducible)
+//! -Empreinte collision-resistant (SHA256)
+//! -Protection contre le spoofing d'identité
 use sha2::{Sha256, Digest};
 use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer};
 use std::error::Error;
@@ -20,7 +60,6 @@ pub struct GestionnaireIdentite {
 
 impl GestionnaireIdentite {
     pub fn nouveau() -> Self {
-        // ✅ FIX: Utiliser from_bytes avec des octets aléatoires
         let mut secret_bytes = [0u8; 32];
         use rand::RngCore;
         rand::thread_rng().fill_bytes(&mut secret_bytes);
@@ -53,7 +92,7 @@ impl GestionnaireIdentite {
         let mut hasher = Sha256::new();
         hasher.update(cle_publique);
         let hash = hasher.finalize();
-        // ✅ FIX: De [..12] à [..16] (64 bits au lieu de 48 bits)
+        
         format!("{:x}", hash)[..16].to_string()
     }
     
@@ -69,7 +108,7 @@ impl GestionnaireIdentite {
     }
     
     pub fn signer(&self, donnees: &[u8]) -> Signature {
-        // ✅ FIX: Importer le trait Signer
+        
         self.cle_signature_locale.sign(donnees)
     }
     

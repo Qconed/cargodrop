@@ -63,7 +63,7 @@ impl AppUseCases for App {
         cle_array.copy_from_slice(&cle_chiffrement_vec);
         session.activer_chiffrement(&cle_array);
         
-        println!("🔐 Chiffrement activé avec: {}", hex::encode(&cle_array[..8]));
+        println!(" Chiffrement activé avec: {}", hex::encode(&cle_array[..8]));
          //securite
         let peer = PeerInfo { // @todo: this should be discovered in future versions
             ip,

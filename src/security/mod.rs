@@ -1,4 +1,40 @@
-// src/security/mod.rs
+//!  Module de Sécurité - Gestionnaire de Session Sécurisée
+//!
+//! Ce module orchestre toute la sécurité de CargoDrop en fournissant une couche
+//! d'abstraction unique pour les opérations cryptographiques.
+//!
+//! # Responsabilités:
+//! - **SecureSession**: Gestionnaire principal qui encapsule toutes les primitives cryptographiques
+//! - **Initialisation**: Crée et gère l'identité locale et les contacts de confiance
+//! - **Handshake**: Établit des sessions sécurisées avec X25519 ECDH + ED25519 signatures
+//! - **Chiffrement/Déchiffrement**: Wrapper pour AES-256-GCM avec gestion des nonces
+//! - **Intégration**: Activée automatiquement dans advertise/discover/send/receive
+//!
+//! # Architecture:
+//! ```
+//! //SecureSession
+//!   ├── //GestionnaireIdentite (ED25519 keypair + empreinte)
+//!   ├── //GestionnaireContacts (persistance des contacts de confiance)
+//!   ├── //CipherManager (chiffrement AES-256-GCM)
+//!   └──//DecipherManager (déchiffrement AES-256-GCM)
+//! ```
+//!
+//! # Flux de Sécurité:
+//! 1. `new()` → Crée identité + contacts
+//! 2. `initier_handshake()` → X25519 DH + dérive clé HKDF
+//! 3. `activer_chiffrement()` → Initialise cipher/decipher
+//! 4. `chiffrer/dechiffrer()` → AES-256-GCM avec protection DoS
+//!
+//! # Garanties de Sécurité:
+//! -Authentification mutuelle (ED25519)
+//! -Échange de clé sécurisé (X25519)
+//! -Chiffrement authentifié (AES-256-GCM)
+//! -Protection contre les replays (numérotation séquentielle)
+//! -Protection DoS (limites de taille)
+
+
+
+
 pub mod identity;
 pub mod handshake;
 pub mod encryption;
@@ -25,7 +61,7 @@ impl SecureSession {
     pub async fn new(nom_appareil: String) -> Result<Self, Box<dyn Error>> {
         // Créer le répertoire de config
         let config_dir = home_dir()
-            .ok_or("❌ Impossible de trouver le répertoire home")?
+            .ok_or(" Impossible de trouver le répertoire home")?
             .join(".cargodrop")
             .join("security");
         
@@ -39,7 +75,7 @@ impl SecureSession {
         
         // Afficher l'empreinte au démarrage
         identite.afficher_empreinte_locale();
-        println!("✅ Session sécurisée initialisée: {}\n", nom_appareil);
+        println!(" Session sécurisée initialisée: {}\n", nom_appareil);
         
         Ok(Self {
             identite,
@@ -89,7 +125,7 @@ impl SecureSession {
     pub fn chiffrer(&mut self, donnees: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         self.cipher
             .as_mut()
-            .ok_or("❌ Chiffrement non activé")?
+            .ok_or(" Chiffrement non activé")?
             .chiffrer_bloc(donnees)
     }
     
@@ -97,7 +133,7 @@ impl SecureSession {
     pub fn dechiffrer(&mut self, donnees_chiffrees: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         self.decipher
             .as_mut()
-            .ok_or("❌ Déchiffrement non activé")?
+            .ok_or(" Déchiffrement non activé")?
             .dechiffrer_bloc(donnees_chiffrees)
     }
 }
