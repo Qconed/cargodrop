@@ -11,6 +11,7 @@ pub struct Cli {
 }
 
 #[derive(Subcommand)]
+#[command(rename_all = "lowercase")]
 pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the documentation of the commands !!
     /// Start CargoDrop in Advertiser Mode
     Advertise,
@@ -40,6 +41,32 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         #[arg(short, long)]
         file: String,
     },
+    /// Get local IP address
+    GetIp,
+    /// Get current username
+    GetName,
+    /// Set username (max 9 characters)
+    SetName {
+        /// The new username
+        #[arg(value_name = "NAME")]
+        name: Option<String>,
+        /// Reset to system hostname
+        #[arg(long)]
+        default: bool,
+    },
+    /// Get configured HTTP transfer port
+    GetPort,
+    /// Set HTTP transfer port
+    SetPort {
+        /// The new port number
+        #[arg(value_name = "PORT")]
+        port: Option<u16>,
+        /// Reset to default port (8080)
+        #[arg(long)]
+        default: bool,
+    },
+    /// Display all user configuration info
+    Info,
 }
 
 /// The cli component uses dependency inversion of the App use cases to run
@@ -73,6 +100,36 @@ impl Cli {
                 ).await;
                 
                 use_cases.interactive_send(file).await?;
+            }
+            Commands::GetIp => {
+                use_cases.get_ip().await?;
+            }
+            Commands::GetName => {
+                use_cases.get_name().await?;
+            }
+            Commands::SetName { name, default } => {
+                if default {
+                    use_cases.set_name_default().await?;
+                } else if let Some(n) = name {
+                    use_cases.set_name(n).await?;
+                } else {
+                    return Err("Usage: cargodrop set-name <NAME> or set-name --default".into());
+                }
+            }
+            Commands::GetPort => {
+                use_cases.get_port().await?;
+            }
+            Commands::SetPort { port, default } => {
+                if default {
+                    use_cases.set_port_default().await?;
+                } else if let Some(p) = port {
+                    use_cases.set_port(p).await?;
+                } else {
+                    return Err("Usage: cargodrop set-port <PORT> or set-port --default".into());
+                }
+            }
+            Commands::Info => {
+                use_cases.info().await?;
             }
         }
         Ok(())

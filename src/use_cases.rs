@@ -17,4 +17,14 @@ pub trait AppUseCases {
     /// Pre: assumes a discovery has been made, and the peers list is populated
     /// Enables a user to send a file to a already detected other peer (asks for peer selection)
     fn interactive_send(&self, file_path: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    
+    // User info management use cases
+    fn get_ip(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn get_name(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_name(&self, name: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_name_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn get_port(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_port(&self, port: u16) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn set_port_default(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn info(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
 }
