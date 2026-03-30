@@ -172,6 +172,28 @@ impl CargodropApp {
         ui.group(|ui| {
             ui.label(RichText::new("Discovered Peers").strong());
             
+            if ui.button("🔍 Start Discovery").clicked() {
+                let state = self.state.clone();
+                
+                // Spawn a task to discover peers
+                std::thread::spawn(move || {
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(async {
+                        if let Ok(mut status) = state.app_status.lock() {
+                            *status = "Discovering peers for 20 seconds...".to_string();
+                        }
+                        
+                        // TODO: Call App::discover() here once we have access to App
+                        // For now, just simulate
+                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        
+                        if let Ok(mut status) = state.app_status.lock() {
+                            *status = "Discovery complete".to_string();
+                        }
+                    });
+                });
+            }
+            
             if let Ok(peers) = self.state.peers.lock() {
                 if peers.is_empty() {
                     ui.label("No peers discovered. Start discovery to find peers.");
@@ -279,10 +301,27 @@ impl CargodropApp {
                     ui.label("Waiting for incoming transfers...");
                 } else {
                     if ui.button("🎧 Start Listening").clicked() {
-                        // TODO: Trigger listening
-                        if let Ok(mut status) = self.state.app_status.lock() {
-                            *status = "Starting to listen...".to_string();
-                        }
+                        let state = self.state.clone();
+                        
+                        // Spawn a blocking task to start receiving
+                        std::thread::spawn(move || {
+                            let rt = tokio::runtime::Runtime::new().unwrap();
+                            rt.block_on(async {
+                                if let Ok(mut status) = state.app_status.lock() {
+                                    *status = "Starting receiver on port 5001...".to_string();
+                                }
+                                
+                                // Simulate receiving (would call App::receive() here)
+                                // For now, just update the port
+                                if let Ok(mut port_guard) = state.listening_port.lock() {
+                                    *port_guard = Some(5001);
+                                }
+                                
+                                if let Ok(mut status) = state.app_status.lock() {
+                                    *status = "Listening on port 5001".to_string();
+                                }
+                            });
+                        });
                     }
                 }
             }
