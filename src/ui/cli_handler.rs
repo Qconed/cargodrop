@@ -3,10 +3,12 @@ use crate::rendezvous::Peer;
 use crate::ui::interaction::{InteractionHandler, PeerEvent};
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::path::Path;
 
 pub struct CliHandler;
 
 impl InteractionHandler for CliHandler {
+    // ===== Peer Discovery & Management =====
     fn display_peers_list(&self, peers: &HashMap<String, Peer>) {
         if peers.is_empty() {
             println!("{:<15} | {:<15} | {:<6}", "Username", "IP Address", "Port");
@@ -17,7 +19,7 @@ impl InteractionHandler for CliHandler {
         }
 
         println!("{:<15} | {:<15} | {:<6}", "Username", "IP Address", "Port");
-        println!("{:-<42}", ""); // Separator line
+        println!("{:-<42}", "");
 
         for peer in peers.values() {
             let ip_str = format!(
@@ -76,5 +78,109 @@ impl InteractionHandler for CliHandler {
 
         println!("Invalid selection.");
         None
+    }
+
+    // ===== File Selection & Transfer =====
+    fn select_file_to_send(&self) -> Option<String> {
+        print!("\nEnter file path to send (or 'q' to cancel): ");
+        io::stdout().flush().ok();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).ok();
+        let input = input.trim();
+
+        if input.to_lowercase() == "q" {
+            return None;
+        }
+
+        if Path::new(input).exists() {
+            return Some(input.to_string());
+        }
+
+        println!("File not found: {}", input);
+        None
+    }
+
+    fn confirm_transfer(&self, sender: &str, filename: &str, size: u64) -> bool {
+        println!();
+        println!("Incoming file transfer request:");
+        println!("  Sender: {}", sender);
+        println!("  File: {}", filename);
+        println!("  Size: {} bytes", size);
+        println!("Accept transfer? [y/N]");
+        print!("\n> ");
+        io::stdout().flush().ok();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).ok();
+        let choice = input.trim().to_lowercase();
+
+        matches!(choice.as_str(), "y" | "yes")
+    }
+
+    // ===== Progress & Status Updates =====
+    fn show_transfer_progress(&self, filename: &str, percent: f64, sent: u64, total: u64) {
+        println!(
+            "[{}] Transferring '{}': {:.0}% ({} / {} bytes)",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+            filename,
+            percent,
+            sent,
+            total
+        );
+    }
+
+    fn show_app_status(&self, status: &str) {
+        println!("\n=== {} ===", status);
+    }
+
+    fn show_receiver_listening(&self, port: u16) {
+        println!("\n📡 Receiver listening on port {}", port);
+        println!("Waiting for incoming file transfers...");
+    }
+
+    // ===== Messages (Error & Success) =====
+    fn show_error(&self, message: &str) {
+        eprintln!("\n❌ Error: {}", message);
+    }
+
+    fn show_success(&self, message: &str) {
+        println!("\n✅ Success: {}", message);
+    }
+
+    fn show_info(&self, message: &str) {
+        println!("\nℹ️  {}", message);
+    }
+
+    // ===== File Management =====
+    fn show_received_files(&self, files: &[String]) {
+        if files.is_empty() {
+            println!("\nNo files received yet.");
+            return;
+        }
+
+        println!("\n--- Received Files ---");
+        for (i, file) in files.iter().enumerate() {
+            println!("{}. {}", i + 1, file);
+        }
+        println!();
+    }
+
+    fn request_save_location(&self, filename: &str) -> Option<String> {
+        print!("\nSave file as (default: {}): ", filename);
+        io::stdout().flush().ok();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).ok();
+        let input = input.trim();
+
+        if input.is_empty() {
+            return Some(filename.to_string());
+        }
+
+        Some(input.to_string())
     }
 }
