@@ -88,8 +88,8 @@ impl Cli {
                 use_cases.send(ip, port, file).await?;
             }
             Commands::Receive { port } => {
-                println!("Starting CargoDrop in Receive Mode...");
-                use_cases.receive(port).await?;
+                println!("Starting CargoDrop in Receive Mode (with background advertisement)...");
+                use_cases.advertise_and_receive(port).await?;
             }
             Commands::Sendinter { file } => {
                 // here in the cli for the sendinter, discovery is done as a one off thing

@@ -21,6 +21,7 @@ use tokio::sync::RwLock;
 use ui::interaction::InteractionHandler;
 use ui::cli_handler::CliHandler;
 
+#[derive(Clone)]
 struct App {
     peers: rendezvous::PeerMap,
     handler: Arc<dyn InteractionHandler>,
@@ -76,6 +77,21 @@ impl AppUseCases for App {
 
         let server = TcpServer::new(actual_port, username);
         server.start()
+    }
+
+    async fn advertise_and_receive(&self, port: Option<u16>) -> Result<(), Box<dyn Error>> {
+        // Trigger advertisement in the background using the dedicated use case
+        let app_clone = self.clone();   // increment reference count to the app. Clone is required because we need a 
+                                        // variable that will be able to outlive the function into the tokio thread
+        
+        tokio::spawn(async move {
+            if let Err(e) = app_clone.advertise().await {
+                eprintln!("Background advertisement error: {}", e);
+            }
+        });
+
+        // Start the receive server to listen for incoming files
+        self.receive(port).await
     }
 
     async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
