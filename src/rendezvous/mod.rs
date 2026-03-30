@@ -23,6 +23,7 @@ pub type PeerMap = Arc<RwLock<HashMap<String, Peer>>>;
 // The RendezVousManager will be in charge of handling the multiple "P2P" discovery means, and will enable switching between implementations
 // LAN is the preffered method, but DNS-SD is blocked over some networks
 // => when LAN impossible, fall back to bluetooth detection.
+#[allow(dead_code)] // @todo implementation of LAN discovery is still to be done
 pub enum RendezvousImpl {
     Lan,
     Bluetooth,
