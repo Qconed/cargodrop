@@ -133,6 +133,7 @@ fn build_advertisement_payload(user: &UserInfo) -> ([u8; 4], u16, String, String
     let empreinte = GestionnaireIdentite::creer_empreinte(&cle_pub);
     let identifiant_court = GestionnaireIdentite::creer_identifiant_court(&empreinte);
     let display_name = format!("{}_{}",truncated_username, identifiant_court);
+    let display_name_truncated = truncate_username_for_payload(&display_name);
     //security
     let device_name_payload = encode_network_info_to_name(ip, port, &display_name);
     println!(
