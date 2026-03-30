@@ -139,10 +139,11 @@ pub async fn discover_rendezvous() -> Result<(), Box<dyn Error>> {
                                 // Only print if this is a brand new peer we haven't seen yet
                                 // if !active_peers.contains_key(&payload_key) {
                                     let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
+                                    let display_name = format!("{}_????", peer.username);
                                     println!("[{}] --- PEER DETECTED ---", time_str);
                                     println!(
                                         "  + Username: '{}', IP: {}, Port: {}",
-                                        peer.username, peer_ip, peer.port
+                                        display_name, peer_ip, peer.port
                                     );
                                 // }
                                 
