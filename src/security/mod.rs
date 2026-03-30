@@ -201,4 +201,12 @@ impl SecureSession {
         
         Ok(resultat)
     }
+
+    pub fn get_identifiant_court(&self) -> String {
+        let empreinte = GestionnaireIdentite::creer_empreinte(
+            self.identite.obtenir_cle_verification_locale().as_slice()
+        );
+        GestionnaireIdentite::creer_identifiant_court(&empreinte)
+    }
+
 }

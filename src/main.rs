@@ -13,9 +13,9 @@ use clap::Parser;
 use std::error::Error;
 use user_info::UserInfo;
 //securite
+use crate::security::{SecureSession, GestionnaireIdentite};
 use tokio::sync::Mutex;
 use std::sync::Arc;
-use security::SecureSession;
 //securite
 
 use network::file_transfer::PeerInfo;
@@ -35,6 +35,13 @@ impl AppUseCases for App {
     async fn advertise(&self) -> Result<(), Box<dyn Error>> {
         //securite
         let session = SecureSession::new("cargodrop-advertiser".to_string()).await?;
+        let empreinte = GestionnaireIdentite::creer_empreinte(
+            session.identite.obtenir_cle_verification_locale().as_slice()
+        );
+        let identifiant_court = GestionnaireIdentite::creer_identifiant_court(&empreinte);
+        let user = UserInfo::load().await?;
+        let display_name = format!("{}_{}",user.username, identifiant_court);
+        println!("Appareil: {}", display_name);
         *SECURE_SESSION.lock().await = Some(session);
         //securite
         rendezvous::RendezvousManager::advertise_manage().await

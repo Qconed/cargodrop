@@ -127,6 +127,11 @@ impl GestionnaireIdentite {
         Ok(())
     }
     
+    pub fn creer_identifiant_court(empreinte: &str) -> String {
+        // Prendre les 4 premiers caractères de l'empreinte
+        empreinte[..4].to_string()
+    }
+
     pub fn afficher_empreinte_locale(&self) {
         let empreinte = Self::creer_empreinte(self.obtenir_cle_verification_locale().as_slice());
         println!("\n╔════════════════════════════════════════╗");
