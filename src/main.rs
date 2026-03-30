@@ -2,8 +2,8 @@ mod rendezvous;
 mod cli;
 mod use_cases;
 mod network;
-mod ui;
 mod user_info;
+mod ui;
 
 use use_cases::AppUseCases;
 use cli::Cli;
@@ -14,26 +14,18 @@ use user_info::UserInfo;
 use network::file_transfer::PeerInfo;
 use network::tcp_client::TcpClient;
 use network::tcp_server::TcpServer;
-
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use ui::interaction::InteractionHandler;
-use ui::cli_handler::CliHandler;
 use ui::gui_handler::GuiHandler;
 use ui::egui_app::{CargodropApp, GuiAppState};
 
-struct App {
-    peers: rendezvous::PeerMap,
-    handler: Arc<dyn InteractionHandler>,
-}
+struct App;
 
-impl App {
-    fn new(handler: Arc<dyn InteractionHandler>) -> Self {
-        Self {
-            peers: Arc::new(RwLock::new(HashMap::new())),
-            handler,
-        }
+impl Clone for App {
+    fn clone(&self) -> Self {
+        App
+    }
+    
+    fn clone_from(&mut self, source: &Self) {
+        *self = source.clone();
     }
 }
 
@@ -44,10 +36,7 @@ impl AppUseCases for App {
     }
 
     async fn discover(&self) -> Result<(), Box<dyn Error>> {
-        let peers_clone = self.peers.clone();
-        let handler_clone = self.handler.clone();
-        
-        rendezvous::RendezvousManager::discover_manage(peers_clone, handler_clone).await
+        rendezvous::RendezvousManager::discover_manage().await
     }
 
     async fn send(&self, ip: String, port: u16, file_path: String) -> Result<(), Box<dyn Error>> {
@@ -64,26 +53,6 @@ impl AppUseCases for App {
     async fn receive(&self, port: u16) -> Result<(), Box<dyn Error>> {
         let server = TcpServer::new(port, "DEFAULT_NAME".to_string());
         server.start()
-    }
-
-    async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
-        let peer_infos: Vec<PeerInfo> = {
-            let peers_guard = self.peers.read().await;
-            peers_guard.values().map(|p| PeerInfo {
-                ip: format!("{}.{}.{}.{}", p.ip[0], p.ip[1], p.ip[2], p.ip[3]),
-                port: p.port,
-                device_name: p.username.clone(),
-            }).collect()
-        };
-
-        // once peer have been searched, called the UI handler to select a peer
-        // behavior will be different if handler = CLI, or GUI, but it will still produce the same result
-        if let Some(selected_peer) = self.handler.select_peer(&peer_infos) {
-            self.send(selected_peer.ip, selected_peer.port, file_path).await
-        } else {
-            println!("No peer selected or operation cancelled.");
-            Ok(())
-        }
     }
 
     // User info use cases
@@ -149,15 +118,13 @@ impl AppUseCases for App {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
+    let app = App;
 
-    // Check if GUI mode is requested
     if cli.gui {
-        // Launch GUI mode with egui
+        // Launch GUI mode with egui/eframe
         run_gui_mode().await?;
     } else {
         // Launch CLI mode
-        let handler = Arc::new(CliHandler);
-        let app = App::new(handler);
         cli.run(&app).await?;
     }
 
@@ -167,25 +134,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 /// Run the GUI application with egui/eframe
 async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
     let state = GuiAppState::default();
-    let _handler = Arc::new(GuiHandler::new(state.clone()));
-    let _app = App::new(_handler);
-
-    // Options for eframe
+    let handler = GuiHandler::new(state.clone());
+    
+    // Run the tokio runtime alongside egui
+    // We'll spawn a background task for async operations
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 700.0]),
         ..Default::default()
     };
 
-    let state_clone = state.clone();
     // Run the egui application
-    let _ = eframe::run_native(
-        "CargoDrop 📦",
+    eframe::run_native(
+        "CargoDrop",
         options,
-        Box::new(move |_cc| Box::new(CargodropApp {
-            state: state_clone.clone(),
-        })),
-    );
-
-    Ok(())
+        Box::new(|_cc| Ok(Box::new(CargodropApp { state }))),
+    )
+    .map_err(|e| format!("egui error: {}", e).into())
 }
+
