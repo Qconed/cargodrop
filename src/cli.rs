@@ -22,18 +22,18 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         /// Receiver's IP address
         #[arg(short, long)]
         ip: String,
-        /// Receiver's port (default: 5001)
-        #[arg(short, long, default_value_t = 5001)]
-        port: u16,
+        /// Receiver's port
+        #[arg(short, long)]
+        port: Option<u16>,
         /// Path to the file to send
         #[arg(short, long)]
         file: String,
     },
     /// Receive a file
     Receive {
-        /// Port to listen on (default: 5001)
-        #[arg(short, long, default_value_t = 5001)]
-        port: u16,
+        /// Port to listen on
+        #[arg(short, long)]
+        port: Option<u16>,
     },
     /// Send a file interactively (trigger a discovery, and choose to whom to send)
     Sendinter {

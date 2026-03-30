@@ -19,11 +19,10 @@ pub(crate) const MAX_RAW_PAYLOAD_BYTES: usize = 21;
 pub struct BleRendezvous {}
 
 impl RendezvousTrait for BleRendezvous {
-    async fn advertise() -> Result<(), Box<dyn Error>> {
+    async fn advertise(user: &UserInfo) -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting advertisement...");
-        let user = UserInfo::load().await?;
-        println!("Loaded user config: username='{}', port={}", user.username, user.port);
-        advertise::advertise_rendezvous(&user).await
+        println!("Using user config: username='{}', port={}", user.username, user.port);
+        advertise::advertise_rendezvous(user).await
     }
     
     async fn discover(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
