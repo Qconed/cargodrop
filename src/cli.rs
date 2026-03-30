@@ -46,9 +46,10 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
     /// Get current username
     GetName,
     /// Set username (max 14 characters)
+    #[command(group(clap::ArgGroup::new("set-name-action").required(true).args(["name", "default"])))]
     SetName {
         /// The new username
-        #[arg(value_name = "NAME")]
+        #[arg(value_name = "NAME", conflicts_with = "default")]
         name: Option<String>,
         /// Reset to system hostname
         #[arg(long)]
@@ -57,9 +58,10 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
     /// Get configured HTTP transfer port
     GetPort,
     /// Set HTTP transfer port
+    #[command(group(clap::ArgGroup::new("set-port-action").required(true).args(["port", "default"])))]
     SetPort {
         /// The new port number
-        #[arg(value_name = "PORT")]
+        #[arg(value_name = "PORT", conflicts_with = "default")]
         port: Option<u16>,
         /// Reset to default port (8080)
         #[arg(long)]
@@ -110,10 +112,8 @@ impl Cli {
             Commands::SetName { name, default } => {
                 if default {
                     use_cases.set_name_default().await?;
-                } else if let Some(n) = name {
-                    use_cases.set_name(n).await?;
                 } else {
-                    return Err("Usage: cargodrop set-name <NAME> or set-name --default".into());
+                    use_cases.set_name(name.unwrap()).await?;
                 }
             }
             Commands::GetPort => {
@@ -122,10 +122,8 @@ impl Cli {
             Commands::SetPort { port, default } => {
                 if default {
                     use_cases.set_port_default().await?;
-                } else if let Some(p) = port {
-                    use_cases.set_port(p).await?;
                 } else {
-                    return Err("Usage: cargodrop set-port <PORT> or set-port --default".into());
+                    use_cases.set_port(port.unwrap()).await?;
                 }
             }
             Commands::Info => {
