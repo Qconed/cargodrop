@@ -88,7 +88,7 @@ impl UserInfo {
     }
 }
 
-/// Tronque le username à 9 caractères (limite du payload BLE)
+/// Tronque le username à 14 caractères (limite du payload BLE héritée)
 fn truncate_username(name: &str) -> String {
-    name.chars().take(9).collect()
+    name.chars().take(14).collect()
 }

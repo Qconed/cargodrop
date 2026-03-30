@@ -45,7 +45,7 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
     GetIp,
     /// Get current username
     GetName,
-    /// Set username (max 9 characters)
+    /// Set username (max 14 characters)
     SetName {
         /// The new username
         #[arg(value_name = "NAME")]
