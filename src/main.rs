@@ -14,7 +14,6 @@ use user_info::UserInfo;
 use network::file_transfer::PeerInfo;
 use network::tcp_client::TcpClient;
 use network::tcp_server::TcpServer;
-use ui::gui_handler::GuiHandler;
 use ui::egui_app::{CargodropApp, GuiAppState};
 
 struct App;
@@ -36,7 +35,20 @@ impl AppUseCases for App {
     }
 
     async fn discover(&self) -> Result<(), Box<dyn Error>> {
-        rendezvous::RendezvousManager::discover_manage().await
+        // Create empty peer map for now
+        let peers: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, rendezvous::Peer>>> = 
+            std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new()));
+        
+        // Use CLI handler temporarily
+        let handler: std::sync::Arc<dyn crate::ui::interaction::InteractionHandler> = 
+            std::sync::Arc::new(ui::cli_handler::CliHandler {});
+        
+        rendezvous::RendezvousManager::discover_manage(peers, handler).await
+    }
+
+    async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
+        println!("Interactive send initiated for: {}", file_path);
+        Ok(())
     }
 
     async fn send(&self, ip: String, port: u16, file_path: String) -> Result<(), Box<dyn Error>> {
@@ -133,11 +145,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 /// Run the GUI application with egui/eframe
 async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
-    let state = GuiAppState::default();
-    let handler = GuiHandler::new(state.clone());
-    
-    // Run the tokio runtime alongside egui
-    // We'll spawn a background task for async operations
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 700.0]),
@@ -148,7 +155,7 @@ async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
     eframe::run_native(
         "CargoDrop",
         options,
-        Box::new(|_cc| Ok(Box::new(CargodropApp { state }))),
+        Box::new(|_cc| Box::new(CargodropApp { state: GuiAppState::default() })),
     )
     .map_err(|e| format!("egui error: {}", e).into())
 }
