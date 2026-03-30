@@ -1,123 +1,160 @@
 use crate::network::file_transfer::PeerInfo;
 use crate::rendezvous::Peer;
 use crate::ui::interaction::{InteractionHandler, PeerEvent};
+use crate::ui::egui_app::{GuiAppState, Message, MessageLevel};
 use std::collections::HashMap;
 
-/// GUI Handler for graphical interface implementation
-/// This will be replaced with actual GUI framework (Tauri, GTK, etc.)
-pub struct GuiHandler;
+/// GUI Handler for egui application
+/// Communicates with GuiAppState to update the GUI
+pub struct GuiHandler {
+    pub state: GuiAppState,
+}
+
+impl GuiHandler {
+    pub fn new(state: GuiAppState) -> Self {
+        Self { state }
+    }
+}
 
 impl InteractionHandler for GuiHandler {
     // ===== Peer Discovery & Management =====
     fn display_peers_list(&self, peers: &HashMap<String, Peer>) {
-        // TODO: Render peers list in GUI
-        // For now, fallback to CLI output
-        if peers.is_empty() {
-            println!("[GUI] No peers discovered yet.");
-            return;
-        }
-
-        println!("[GUI] Peers found:");
-        for peer in peers.values() {
-            let ip_str = format!(
-                "{}.{}.{}.{}",
-                peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3]
-            );
-            println!("[GUI]   - {} ({}:{})", peer.username, ip_str, peer.port);
+        if let Ok(mut state_peers) = self.state.peers.lock() {
+            *state_peers = peers.clone();
         }
     }
 
     fn handle_peer_event(&self, event: PeerEvent) {
-        // TODO: Show notification in GUI
-        match event {
+        let message = match event {
             PeerEvent::NewPeer(peer, time) => {
-                println!("[GUI] New peer detected: {} at {}", peer.username, time);
+                format!("New peer detected: {} at {}", peer.username, time)
             }
             PeerEvent::PeerLost(peer, time) => {
-                println!("[GUI] Peer disconnected: {} at {}", peer.username, time);
+                format!("Peer disconnected: {} at {}", peer.username, time)
             }
+        };
+        
+        if let Ok(mut messages) = self.state.messages.lock() {
+            messages.push(Message {
+                content: message,
+                level: MessageLevel::Info,
+            });
         }
     }
 
     fn select_peer(&self, peers: &[PeerInfo]) -> Option<PeerInfo> {
-        // TODO: Show peer selection dialog in GUI
-        if peers.is_empty() {
-            println!("[GUI] No peers available.");
-            return None;
+        // Try to get selected peer from state
+        if let Ok(selected) = self.state.selected_peer.lock() {
+            if let Some(selected_name) = selected.as_ref() {
+                // Find peer by name
+                if let Some(peer) = peers.iter().find(|p| &p.device_name == selected_name) {
+                    return Some(peer.clone());
+                }
+            }
         }
-
+        
         // Fallback: return first peer
-        Some(peers[0].clone())
+        peers.first().cloned()
     }
 
     // ===== File Selection & Transfer =====
     fn select_file_to_send(&self) -> Option<String> {
-        // TODO: Show file chooser dialog in GUI
-        println!("[GUI] File selection dialog would appear here.");
-        None
+        // Return selected file from state
+        if let Ok(file) = self.state.selected_file.lock() {
+            file.as_ref().cloned()
+        } else {
+            None
+        }
     }
 
     fn confirm_transfer(&self, sender: &str, filename: &str, size: u64) -> bool {
-        // TODO: Show confirmation dialog in GUI
-        println!(
-            "[GUI] Transfer confirmation dialog: {} from {}, size: {} bytes",
-            filename, sender, size
-        );
-        false // Default: reject in stub
+        // Set pending confirmation and wait for user response
+        if let Ok(mut confirmation) = self.state.confirmation_pending.lock() {
+            confirmation.sender = sender.to_string();
+            confirmation.filename = filename.to_string();
+            confirmation.size = size;
+            confirmation.response = None;
+        }
+        
+        // Wait for user response (in a real app, this would be async)
+        // For now, we'll poll the state
+        for _ in 0..100 {
+            if let Ok(confirmation) = self.state.confirmation_pending.lock() {
+                if let Some(response) = confirmation.response {
+                    return response;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        
+        // Timeout: reject transfer
+        false
     }
 
     // ===== Progress & Status Updates =====
     fn show_transfer_progress(&self, filename: &str, percent: f64, sent: u64, total: u64) {
-        // TODO: Update progress bar in GUI
-        println!(
-            "[GUI] Progress: {} - {:.0}% ({}/{})",
-            filename, percent, sent, total
-        );
+        if let Ok(mut progress) = self.state.transfer_progress.lock() {
+            progress.filename = filename.to_string();
+            progress.percent = percent;
+            progress.sent = sent;
+            progress.total = total;
+            progress.is_active = true;
+        }
     }
 
     fn show_app_status(&self, status: &str) {
-        // TODO: Update status bar in GUI
-        println!("[GUI] Status: {}", status);
+        if let Ok(mut app_status) = self.state.app_status.lock() {
+            *app_status = status.to_string();
+        }
     }
 
     fn show_receiver_listening(&self, port: u16) {
-        // TODO: Show listening indicator in GUI
-        println!("[GUI] Listening on port {}", port);
+        if let Ok(mut listening_port) = self.state.listening_port.lock() {
+            *listening_port = Some(port);
+        }
+        
+        if let Ok(mut status) = self.state.app_status.lock() {
+            *status = format!("Listening on port {}", port);
+        }
     }
 
     // ===== Messages (Error & Success) =====
     fn show_error(&self, message: &str) {
-        // TODO: Show error dialog in GUI
-        eprintln!("[GUI] Error: {}", message);
+        if let Ok(mut messages) = self.state.messages.lock() {
+            messages.push(Message {
+                content: message.to_string(),
+                level: MessageLevel::Error,
+            });
+        }
     }
 
     fn show_success(&self, message: &str) {
-        // TODO: Show success notification in GUI
-        println!("[GUI] Success: {}", message);
+        if let Ok(mut messages) = self.state.messages.lock() {
+            messages.push(Message {
+                content: message.to_string(),
+                level: MessageLevel::Success,
+            });
+        }
     }
 
     fn show_info(&self, message: &str) {
-        // TODO: Show info notification in GUI
-        println!("[GUI] Info: {}", message);
+        if let Ok(mut messages) = self.state.messages.lock() {
+            messages.push(Message {
+                content: message.to_string(),
+                level: MessageLevel::Info,
+            });
+        }
     }
 
     // ===== File Management =====
     fn show_received_files(&self, files: &[String]) {
-        // TODO: Display received files list in GUI
-        if files.is_empty() {
-            println!("[GUI] No files received yet.");
-            return;
-        }
-
-        println!("[GUI] Received files:");
-        for file in files {
-            println!("[GUI]   - {}", file);
-        }
+        let files_list = files.join(", ");
+        self.show_info(&format!("Received files: {}", files_list));
     }
 
     fn request_save_location(&self, filename: &str) -> Option<String> {
-        // TODO: Show file save dialog in GUI
-        println!("[GUI] Save file dialog for: {}", filename);
-        Some(filename.to_string())
+        // In a real app, this would show a file dialog
+        // For now, return the received folder
+        Some(format!("received/{}", filename))
     }
 }

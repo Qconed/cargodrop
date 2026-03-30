@@ -20,6 +20,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use ui::interaction::InteractionHandler;
 use ui::cli_handler::CliHandler;
+use ui::gui_handler::GuiHandler;
+use ui::egui_app::{CargodropApp, GuiAppState};
 
 struct App {
     peers: rendezvous::PeerMap,
@@ -27,10 +29,10 @@ struct App {
 }
 
 impl App {
-    fn new() -> Self {
+    fn new(handler: Arc<dyn InteractionHandler>) -> Self {
         Self {
             peers: Arc::new(RwLock::new(HashMap::new())),
-            handler: Arc::new(CliHandler), // implementation of the CLI version of the app
+            handler,
         }
     }
 }
@@ -147,9 +149,43 @@ impl AppUseCases for App {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let app = App::new();
 
-    cli.run(&app).await?;
+    // Check if GUI mode is requested
+    if cli.gui {
+        // Launch GUI mode with egui
+        run_gui_mode().await?;
+    } else {
+        // Launch CLI mode
+        let handler = Arc::new(CliHandler);
+        let app = App::new(handler);
+        cli.run(&app).await?;
+    }
+
+    Ok(())
+}
+
+/// Run the GUI application with egui/eframe
+async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
+    let state = GuiAppState::default();
+    let _handler = Arc::new(GuiHandler::new(state.clone()));
+    let _app = App::new(_handler);
+
+    // Options for eframe
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1000.0, 700.0]),
+        ..Default::default()
+    };
+
+    let state_clone = state.clone();
+    // Run the egui application
+    let _ = eframe::run_native(
+        "CargoDrop 📦",
+        options,
+        Box::new(move |_cc| Box::new(CargodropApp {
+            state: state_clone.clone(),
+        })),
+    );
 
     Ok(())
 }
