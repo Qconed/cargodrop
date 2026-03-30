@@ -62,13 +62,13 @@ impl SecureSession {
         // ÉTAPE 1: Créer le répertoire
         println!("🔐 [SÉCURITÉ] ÉTAPE 1: Initialisation de la session");
         let config_dir = home_dir()
-            .ok_or("❌ Impossible de trouver le répertoire home")?
+            .ok_or(" Impossible de trouver le répertoire home")?
             .join(".cargodrop")
             .join("security");
         
         println!("   └─ Création répertoire: ~/.cargodrop/security/");
         tokio::fs::create_dir_all(&config_dir).await?;
-        println!("   ✅ Répertoire créé");
+        println!("    Répertoire créé");
         
         // ÉTAPE 2: Générer identité ED25519
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 2: Génération de l'identité ED25519");
@@ -86,10 +86,10 @@ impl SecureSession {
         // ÉTAPE 4: Initialiser contacts
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 4: Initialisation du gestionnaire de contacts");
         let contacts = GestionnaireContacts::nouveau(config_dir.to_str().ok_or("Chemin invalide")?)?;
-        println!("   └─ Chemin: ~/.cargodrop/security/contacts_de_confiance.json");
-        println!("   ✅ Gestionnaire prêt");
+        println!("    Chemin: ~/.cargodrop/security/contacts_de_confiance.json");
+        println!("    Gestionnaire prêt");
         
-        println!("\n✅ Session sécurisée initialisée: {}\n", nom_appareil);
+        println!("\n Session sécurisée initialisée: {}\n", nom_appareil);
         
         Ok(Self {
             identite,
@@ -112,9 +112,9 @@ impl SecureSession {
         // Créer les secrets éphémères X25519
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 6: Génération des secrets éphémères X25519");
         let (secret_ephemere, cle_pub_ephemere) = InitiateurPoigneeDeMain::creer_secret_ephemere();
-        println!("   └─ Secret éphémère: 32 bytes (temporaire)");
-        println!("   └─ Clé publique éphémère: 32 bytes (à envoyer)");
-        println!("   ✅ Secrets X25519 créés");
+        println!("    Secret éphémère: 32 bytes (temporaire)");
+        println!("    Clé publique éphémère: 32 bytes (à envoyer)");
+        println!("    Secrets X25519 créés");
         
         // Créer le message d'initialisation
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 7: Création du message de handshake");
@@ -127,8 +127,8 @@ impl SecureSession {
         // Sérialiser le message
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 8: Sérialisation du message");
         let message_bytes = serde_json::to_vec(&message_init)?;
-        println!("   └─ Message sérialisé en JSON: {} bytes", message_bytes.len());
-        println!("   ✅ Message prêt à envoyer");
+        println!("    Message sérialisé en JSON: {} bytes", message_bytes.len());
+        println!("    Message prêt à envoyer");
         
         // Dériver le secret partagé (Diffie-Hellman)
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 9: Dérivation du secret partagé (X25519 DH)");
@@ -136,17 +136,17 @@ impl SecureSession {
             secret_ephemere,
             &cle_pub_ephemere,
         );
-        println!("   └─ Secret partagé calculé: 32 bytes");
-        println!("   └─ Même secret généré des 2 côtés (Diffie-Hellman)");
-        println!("   ✅ DH réussi");
+        println!("    Secret partagé calculé: 32 bytes");
+        println!("    Même secret généré des 2 côtés (Diffie-Hellman)");
+        println!("    DH réussi");
         
         // Dériver la clé de chiffrement avec HKDF
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 10: Dérivation de la clé AES-256-GCM (HKDF-SHA256)");
         let cle_chiffrement = InitiateurPoigneeDeMain::deriver_cle_chiffrement(&secret_partage);
-        println!("   └─ HKDF-SHA256(secret_partage) → clé AES-256");
-        println!("   └─ Clé dérivée: 32 bytes (256 bits)");
-        println!("   └─ Clé AES-256-GCM: {}", hex::encode(&cle_chiffrement[..8]));
-        println!("   ✅ Clé dérivée avec succès\n");
+        println!("    HKDF-SHA256(secret_partage) → clé AES-256");
+        println!("    Clé dérivée: 32 bytes (256 bits)");
+        println!("    Clé AES-256-GCM: {}", hex::encode(&cle_chiffrement[..8]));
+        println!("    Clé dérivée avec succès\n");
         
         Ok((message_bytes, cle_chiffrement))
     }
@@ -154,32 +154,32 @@ impl SecureSession {
     /// Activer le chiffrement avec une clé
     pub fn activer_chiffrement(&mut self, cle_chiffrement: &[u8; 32]) {
         println!("🔐 [SÉCURITÉ] ÉTAPE 11: Activation du chiffrement AES-256-GCM");
-        println!("   └─ Initialisation de CipherManager");
-        println!("   └─ Initialisation de DecipherManager");
-        println!("   └─ Génération du nonce aléatoire (4 bytes)");
+        println!("    Initialisation de CipherManager");
+        println!("    Initialisation de DecipherManager");
+        println!("    Génération du nonce aléatoire (4 bytes)");
         
         self.cipher = Some(CipherManager::nouveau(cle_chiffrement));
         self.decipher = Some(DecipherManager::nouveau(cle_chiffrement));
         
-        println!("   └─ Clé: 256 bits");
-        println!("   └─ Mode: AES-256-GCM (authentification incluse)");
-        println!("   └─ Nonce: 12 bytes (8 bytes numéro + 4 bytes aléatoire)");
-        println!("   ✅ Chiffrement activé\n");
+        println!("    Clé: 256 bits");
+        println!("    Mode: AES-256-GCM (authentification incluse)");
+        println!("    Nonce: 12 bytes (8 bytes numéro + 4 bytes aléatoire)");
+        println!("    Chiffrement activé\n");
     }
 
     /// Chiffrer des données
     pub fn chiffrer(&mut self, donnees: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         println!("🔐 [SÉCURITÉ] ÉTAPE 12: Chiffrement des données");
-        println!("   └─ Taille originale: {} bytes", donnees.len());
+        println!("    Taille originale: {} bytes", donnees.len());
         
         let resultat = self.cipher
             .as_mut()
-            .ok_or("❌ Chiffrement non activé")?
+            .ok_or(" Chiffrement non activé")?
             .chiffrer_bloc(donnees)?;
         
         println!("   └─ Taille chiffrée: {} bytes", resultat.len());
         println!("   └─ (8 bytes numéro + texte chiffré + 16 bytes tag)");
-        println!("   ✅ Données chiffrées avec succès\n");
+        println!("    Données chiffrées avec succès\n");
         
         Ok(resultat)
     }
@@ -187,17 +187,17 @@ impl SecureSession {
     /// Déchiffrer des données
     pub fn dechiffrer(&mut self, donnees_chiffrees: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         println!("🔐 [SÉCURITÉ] ÉTAPE 13: Déchiffrement des données");
-        println!("   └─ Taille chiffrée: {} bytes", donnees_chiffrees.len());
-        println!("   └─ Vérification de l'ordre (numéro de bloc séquentiel)");
-        println!("   └─ Validation du tag d'authentification GCM");
+        println!("    Taille chiffrée: {} bytes", donnees_chiffrees.len());
+        println!("    Vérification de l'ordre (numéro de bloc séquentiel)");
+        println!("    Validation du tag d'authentification GCM");
         
         let resultat = self.decipher
             .as_mut()
-            .ok_or("❌ Déchiffrement non activé")?
+            .ok_or(" Déchiffrement non activé")?
             .dechiffrer_bloc(donnees_chiffrees)?;
         
-        println!("   └─ Taille déchiffrée: {} bytes", resultat.len());
-        println!("   ✅ Tag authentifié - Données intègres\n");
+        println!("    Taille déchiffrée: {} bytes", resultat.len());
+        println!("    Tag authentifié - Données intègres\n");
         
         Ok(resultat)
     }
