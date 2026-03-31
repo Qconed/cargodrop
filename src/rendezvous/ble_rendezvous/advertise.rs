@@ -123,17 +123,16 @@ fn get_local_username(user: &UserInfo) -> String {
     user.username.clone()
 }
 
-fn build_advertisement_payload(user: &UserInfo) -> ([u8; 4], u16, String, String) {
+fn build_advertisement_payload(user: &UserInfo,identite: &crate::security::GestionnaireIdentite,) -> ([u8; 4], u16, String, String) {
     let (ip, port) = get_local_network_info(user);
     let username = get_local_username(user);
     let truncated_username = truncate_username_for_payload(&username);
     //security
-    let identite = GestionnaireIdentite::nouveau();
     let cle_pub = identite.obtenir_cle_verification_locale();
     let empreinte = GestionnaireIdentite::creer_empreinte(&cle_pub);
     let identifiant_court = GestionnaireIdentite::creer_identifiant_court(&empreinte);
     let display_name = format!("{}_{}",truncated_username, identifiant_court);
-    let display_name_truncated = truncate_username_for_payload(&display_name);
+    
     //security
     let device_name_payload = encode_network_info_to_name(ip, port, &display_name);
     println!(
@@ -182,9 +181,10 @@ async fn run_advertise_heartbeat(
 pub async fn advertise_rendezvous(user: &UserInfo) -> Result<(), Box<dyn Error>> {
     let config = AdvertiseConfig::default();
     let service_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
+    let identite = crate::security::GestionnaireIdentite::nouveau();
 
     // 1. Prepare payload components from UserInfo
-    let (ip, port, username, device_name_payload) = build_advertisement_payload(user);
+    let (ip, port, username, device_name_payload) = build_advertisement_payload(user,&identite);
 
     // 2. Initialize BLE Peripheral & Service
     let mut peripheral = init_ble_peripheral(service_uuid).await?;
