@@ -77,4 +77,13 @@ impl InteractionHandler for CliHandler {
         println!("Invalid selection.");
         None
     }
+
+    fn on_advertising_start(&self, username: &str, ip: [u8; 4], port: u16, device_name_payload: &str) {
+        let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
+        println!("[{}] --- ADVERTISING ACTIVE ---", time_str);
+        println!(
+            "  Broadcasting Username: '{}', IP: {}.{}.{}.{}, Port: {} inside Base64 Name: '{}'",
+            username, ip[0], ip[1], ip[2], ip[3], port, device_name_payload
+        );
+    }
 }

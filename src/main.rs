@@ -43,7 +43,7 @@ impl App {
 impl AppUseCases for App {
     async fn advertise(&self) -> Result<(), Box<dyn Error>> {
         let user_guard = self.user_info.read().await;
-        rendezvous::RendezvousManager::advertise_manage(&user_guard).await
+        rendezvous::RendezvousManager::advertise_manage(&user_guard, self.handler.clone()).await
     }
 
     async fn discover(&self) -> Result<(), Box<dyn Error>> {
