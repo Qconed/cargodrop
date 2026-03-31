@@ -1,12 +1,9 @@
 pub mod identity;
 pub mod handshake;
 pub mod encryption;
-pub mod contact;
-
 pub use identity::GestionnaireIdentite;
 pub use handshake::InitiateurPoigneeDeMain;
 pub use encryption::{CipherManager, DecipherManager};
-pub use contact::GestionnaireContacts;
 
 use std::error::Error;
 use dirs::home_dir;
@@ -14,7 +11,6 @@ use dirs::home_dir;
 ///  Gestionnaire de sécurité complet
 pub struct SecureSession {
     pub identite: GestionnaireIdentite,
-    pub contacts: GestionnaireContacts,
     pub cipher: Option<CipherManager>,
     pub decipher: Option<DecipherManager>,
 }
@@ -40,14 +36,10 @@ impl SecureSession {
         println!("\n🔐 [SÉCURITÉ] ÉTAPE 3: Création de l'empreinte digitale");
         identite.afficher_empreinte_locale();
         
-        // ÉTAPE 4: Initialiser contacts
-        println!("\n🔐 [SÉCURITÉ] ÉTAPE 4: Initialisation du gestionnaire de contacts");
-        let contacts = GestionnaireContacts::nouveau(config_dir.to_str().ok_or("Chemin invalide")?)?;
-        println!("\n Session sécurisée initialisée: {}\n", nom_appareil);
+        
         
         Ok(Self {
             identite,
-            contacts,
             cipher: None,
             decipher: None,
         })
