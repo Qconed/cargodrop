@@ -187,7 +187,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     match &cli.command {
         cli::Commands::Gui => {
             // Launch GUI mode with egui/eframe
-            run_gui_mode().await?
+            run_gui_mode(Arc::new(app)).await?
         }
         _ => {
             // Launch CLI mode for other commands
@@ -199,7 +199,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Run the GUI application with egui/eframe
-async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
+async fn run_gui_mode(app: Arc<App>) -> Result<(), Box<dyn Error>> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 700.0]),
@@ -210,7 +210,11 @@ async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
     eframe::run_native(
         "CargoDrop",
         options,
-        Box::new(|_cc| Box::new(CargodropApp::default())),
+        Box::new(move |_cc| {
+            let mut gui_app = CargodropApp::default();
+            gui_app.app = Some(app.clone() as Arc<dyn std::any::Any + Send + Sync>);
+            Box::new(gui_app)
+        }),
     )
     .map_err(|e| format!("egui error: {}", e).into())
 }

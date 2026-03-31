@@ -1,6 +1,7 @@
 use egui::{Color32, RichText, ScrollArea, ProgressBar};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use crate::rendezvous::{Peer, RendezvousManager};
 use crate::ui::gui_handler::GuiHandler;
 
@@ -15,6 +16,9 @@ pub struct GuiAppState {
     pub confirmation_pending: Arc<Mutex<PendingConfirmation>>,
     pub app_status: Arc<Mutex<String>>,
     pub listening_port: Arc<Mutex<Option<u16>>>,
+    pub discovery_active: Arc<Mutex<bool>>,
+    pub discovery_start_time: Arc<Mutex<Option<SystemTime>>>,
+    pub advertising_active: Arc<Mutex<bool>>,
 }
 
 #[derive(Clone, Debug)]
@@ -75,6 +79,9 @@ impl Default for GuiAppState {
             })),
             app_status: Arc::new(Mutex::new("Ready".to_string())),
             listening_port: Arc::new(Mutex::new(None)),
+            discovery_active: Arc::new(Mutex::new(false)),
+            discovery_start_time: Arc::new(Mutex::new(None)),
+            advertising_active: Arc::new(Mutex::new(false)),
         }
     }
 }
@@ -83,13 +90,18 @@ impl Default for GuiAppState {
 pub struct CargodropApp {
     pub state: GuiAppState,
     pub active_tab: usize,  // Track which tab is active (0=Status, 1=Discover, 2=Send, 3=Receive)
+    pub app: Option<Arc<dyn std::any::Any + Send + Sync>>, // Will be set to the App instance
+    pub gui_handler: Arc<GuiHandler>,
 }
 
 impl Default for CargodropApp {
     fn default() -> Self {
+        let state = GuiAppState::default();
         Self {
-            state: GuiAppState::default(),
+            gui_handler: Arc::new(GuiHandler::new(state.clone())),
+            state,
             active_tab: 0,
+            app: None,
         }
     }
 }
@@ -171,59 +183,90 @@ impl CargodropApp {
 
     fn render_discover_tab(&self, ui: &mut egui::Ui) {
         ui.group(|ui| {
-            ui.label(RichText::new("Discovered Peers").strong());
+            ui.label(RichText::new("🔍 Manual Peer Discovery").strong());
+            ui.label("Note: Peer discovery is now integrated in the 'Send' tab (interactive mode).");
+            ui.label("Use this tab to manually discover peers without sending a file.");
             
-            if ui.button("🔍 Start Discovery").clicked() {
-                let state = self.state.clone();
-                
-                // Spawn a task to discover peers
-                std::thread::spawn(move || {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async {
-                        if let Ok(mut messages) = state.messages.lock() {
-                            messages.push(Message {
-                                content: "Starting CargoDrop in Discovery Mode...".to_string(),
-                                level: MessageLevel::Info,
-                            });
+            ui.separator();
+
+            let mut discovery_active = false;
+            if let Ok(active) = self.state.discovery_active.lock() {
+                discovery_active = *active;
+            }
+
+            if discovery_active {
+                ui.label("🔍 Discovering peers...");
+                if let Ok(start_guard) = self.state.discovery_start_time.lock() {
+                    if let Some(start_time) = *start_guard {
+                        if let Ok(elapsed) = start_time.elapsed() {
+                            ui.label(format!("Elapsed: {} seconds", elapsed.as_secs()));
                         }
-                        if let Ok(mut status) = state.app_status.lock() {
-                            *status = "Discovering peers...".to_string();
-                        }
-                        
-                        // Create peer map and handler for discovery
-                        let peers = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
-                        let handler = Arc::new(GuiHandler::new(state.clone()));
-                        
-                        // Call real discovery
-                        match RendezvousManager::discover_manage(peers, handler).await {
-                            Ok(_) => {
-                                if let Ok(mut messages) = state.messages.lock() {
-                                    messages.push(Message {
-                                        content: "Discovery completed successfully".to_string(),
-                                        level: MessageLevel::Success,
-                                    });
-                                }
-                            },
-                            Err(e) => {
-                                if let Ok(mut messages) = state.messages.lock() {
-                                    messages.push(Message {
-                                        content: format!("Discovery error: {}", e),
-                                        level: MessageLevel::Error,
-                                    });
+                    }
+                }
+                if ui.button("⏹️ Stop Discovery").clicked() {
+                    if let Ok(mut active) = self.state.discovery_active.lock() {
+                        *active = false;
+                    }
+                }
+            } else {
+                if ui.button("🔍 Start Manual Discovery").clicked() {
+                    let state = self.state.clone();
+                    
+                    std::thread::spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        rt.block_on(async {
+                            if let Ok(mut active) = state.discovery_active.lock() {
+                                *active = true;
+                            }
+                            if let Ok(mut start) = state.discovery_start_time.lock() {
+                                *start = Some(SystemTime::now());
+                            }
+
+                            if let Ok(mut messages) = state.messages.lock() {
+                                messages.push(Message {
+                                    content: "Starting CargoDrop in Discovery Mode...".to_string(),
+                                    level: MessageLevel::Info,
+                                });
+                            }
+                            
+                            // Create peer map and handler for discovery
+                            let peers = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+                            let handler = Arc::new(GuiHandler::new(state.clone()));
+                            
+                            // Call real discovery
+                            match RendezvousManager::discover_manage(peers, handler).await {
+                                Ok(_) => {
+                                    if let Ok(mut messages) = state.messages.lock() {
+                                        messages.push(Message {
+                                            content: "Discovery completed successfully".to_string(),
+                                            level: MessageLevel::Success,
+                                        });
+                                    }
+                                },
+                                Err(e) => {
+                                    if let Ok(mut messages) = state.messages.lock() {
+                                        messages.push(Message {
+                                            content: format!("Discovery error: {}", e),
+                                            level: MessageLevel::Error,
+                                        });
+                                    }
                                 }
                             }
-                        }
-                        
-                        if let Ok(mut status) = state.app_status.lock() {
-                            *status = "Ready".to_string();
-                        }
+
+                            if let Ok(mut active) = state.discovery_active.lock() {
+                                *active = false;
+                            }
+                        });
                     });
-                });
+                }
             }
+            
+            ui.separator();
+            ui.label(RichText::new("Discovered Peers").strong());
             
             if let Ok(peers) = self.state.peers.lock() {
                 if peers.is_empty() {
-                    ui.label("No peers discovered. Start discovery to find peers.");
+                    ui.label("No peers discovered yet.");
                 } else {
                     ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
                         for (name, peer) in peers.iter() {
@@ -243,23 +286,110 @@ impl CargodropApp {
 
     fn render_send_tab(&self, ui: &mut egui::Ui) {
         ui.group(|ui| {
-            ui.label(RichText::new("Send File").strong());
+            ui.label(RichText::new("📤 Send File (Interactive Mode)").strong());
+            ui.label("This mode discovers peers and lets you choose who to send to.");
+            
+            ui.separator();
 
             // File selection
             ui.horizontal(|ui| {
+                ui.label("File to send:");
                 if let Ok(file) = self.state.selected_file.lock() {
                     if let Some(f) = file.as_ref() {
-                        ui.label(format!("File: {}", f));
+                        ui.label(format!("{}", f));
                     } else {
-                        ui.label("No file selected");
+                        ui.label("(No file selected)");
                     }
-                }
-                
-                if ui.button("📁 Browse").clicked() {
-                    // TODO: Open file picker when rfd is available
-                    ui.label("(File picker coming soon)");
+                } else {
+                    ui.label("(No file selected)");
                 }
             });
+
+            ui.separator();
+
+            // Discovery button
+            let mut discovery_active = false;
+            if let Ok(active) = self.state.discovery_active.lock() {
+                discovery_active = *active;
+            }
+
+            if discovery_active {
+                // Calculate time remaining
+                let mut time_remaining: i32 = 20;
+                if let Ok(start_guard) = self.state.discovery_start_time.lock() {
+                    if let Some(start_time) = *start_guard {
+                        if let Ok(elapsed) = start_time.elapsed() {
+                            time_remaining = 20 - (elapsed.as_secs().min(20) as i32);
+                        }
+                    }
+                }
+
+                ui.horizontal(|ui| {
+                    ui.label(format!("🔍 Discovering peers... ({} seconds remaining)", time_remaining));
+                    ui.add(ProgressBar::new((1.0 - time_remaining as f32 / 20.0).clamp(0.0, 1.0)));
+                });
+            } else {
+                if ui.button("🔍 Start Discovery").clicked() {
+                    let state = self.state.clone();
+                    std::thread::spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        rt.block_on(async {
+                            if let Ok(mut active) = state.discovery_active.lock() {
+                                *active = true;
+                            }
+                            if let Ok(mut start) = state.discovery_start_time.lock() {
+                                *start = Some(SystemTime::now());
+                            }
+                            if let Ok(mut status) = state.app_status.lock() {
+                                *status = "Discovering peers for 20 seconds...".to_string();
+                            }
+                            if let Ok(mut messages) = state.messages.lock() {
+                                messages.push(Message {
+                                    content: "Starting peer discovery for 20 seconds...".to_string(),
+                                    level: MessageLevel::Info,
+                                });
+                            }
+
+                            // Create peer map and handler for discovery
+                            let peers = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+                            let handler = Arc::new(GuiHandler::new(state.clone()));
+
+                            // Run discovery with 20 second timeout
+                            let discover_future = async {
+                                RendezvousManager::discover_manage(peers, handler).await
+                            };
+
+                            let result = tokio::time::timeout(
+                                std::time::Duration::from_secs(20),
+                                discover_future
+                            ).await;
+
+                            if let Ok(Ok(_)) = result {
+                                if let Ok(mut messages) = state.messages.lock() {
+                                    messages.push(Message {
+                                        content: "Discovery completed! Select a peer and your file, then click 'Send File'.".to_string(),
+                                        level: MessageLevel::Success,
+                                    });
+                                }
+                            } else {
+                                if let Ok(mut messages) = state.messages.lock() {
+                                    messages.push(Message {
+                                        content: "Discovery timeout or error. Check discovered peers and retry if needed.".to_string(),
+                                        level: MessageLevel::Info,
+                                    });
+                                }
+                            }
+
+                            if let Ok(mut active) = state.discovery_active.lock() {
+                                *active = false;
+                            }
+                            if let Ok(mut status) = state.app_status.lock() {
+                                *status = "Ready - select peer and send file".to_string();
+                            }
+                        });
+                    });
+                }
+            }
 
             ui.separator();
 
@@ -268,7 +398,7 @@ impl CargodropApp {
             
             if let Ok(peers) = self.state.peers.lock() {
                 if peers.is_empty() {
-                    ui.label("No peers available. Run discovery first.");
+                    ui.label("No peers discovered. Click 'Start Discovery' to find peers.");
                 } else {
                     let peer_names: Vec<String> = peers.keys().cloned().collect();
                     let selected = if let Ok(guard) = self.state.selected_peer.lock() {
@@ -277,26 +407,60 @@ impl CargodropApp {
                         None
                     };
                     
-                    for peer_name in peer_names {
-                        if ui.selectable_label(
-                            selected.as_ref() == Some(&peer_name),
-                            format!("👤 {}", peer_name)
-                        ).clicked() {
-                            if let Ok(mut p) = self.state.selected_peer.lock() {
-                                *p = Some(peer_name);
+                    ScrollArea::vertical().max_height(100.0).show(ui, |ui| {
+                        for peer_name in peer_names {
+                            if ui.selectable_label(
+                                selected.as_ref() == Some(&peer_name),
+                                format!("👤 {}", peer_name)
+                            ).clicked() {
+                                if let Ok(mut p) = self.state.selected_peer.lock() {
+                                    *p = Some(peer_name);
+                                }
                             }
                         }
-                    }
+                    });
                 }
             }
 
             ui.separator();
 
             // Send button
-            if ui.button("➤ Send File").clicked() {
-                // TODO: Trigger actual send
-                if let Ok(mut status) = self.state.app_status.lock() {
-                    *status = "Sending file...".to_string();
+            let can_send = {
+                let peers = self.state.peers.lock().ok().map(|p| !p.is_empty()).unwrap_or(false);
+                let peer_selected = self.state.selected_peer.lock().ok().and_then(|p| p.as_ref().cloned()).is_some();
+                let file_selected = self.state.selected_file.lock().ok().and_then(|f| f.as_ref().cloned()).is_some();
+                peers && peer_selected && file_selected && !discovery_active
+            };
+
+            if ui.add_enabled(can_send, egui::Button::new("➤ Send File")).clicked() {
+                if let Ok(Some(peer_name)) = self.state.selected_peer.lock().map(|p| p.as_ref().cloned()) {
+                    if let Ok(Some(file_path)) = self.state.selected_file.lock().map(|f| f.as_ref().cloned()) {
+                        if let Ok(peers) = self.state.peers.lock() {
+                            if let Some(peer) = peers.get(&peer_name) {
+                                let ip = format!("{}.{}.{}.{}", peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3]);
+                                let port = peer.port;
+                                let state = self.state.clone();
+                                
+                                std::thread::spawn(move || {
+                                    let rt = tokio::runtime::Runtime::new().unwrap();
+                                    rt.block_on(async {
+                                        if let Ok(mut status) = state.app_status.lock() {
+                                            *status = "Sending file...".to_string();
+                                        }
+                                        
+                                        // TODO: Actually send the file using the app's send() method
+                                        // For now, just show a message
+                                        if let Ok(mut messages) = state.messages.lock() {
+                                            messages.push(Message {
+                                                content: format!("Sending '{}' to {}:{}", file_path, ip, port),
+                                                level: MessageLevel::Info,
+                                            });
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -320,36 +484,97 @@ impl CargodropApp {
 
     fn render_receive_tab(&self, ui: &mut egui::Ui) {
         ui.group(|ui| {
-            ui.label(RichText::new("Receive Files").strong());
+            ui.label(RichText::new("📥 Receive Files (with Advertisement)").strong());
+            ui.label("This mode advertises your device and listens for incoming file transfers.");
             
-            if let Ok(port) = self.state.listening_port.lock() {
-                if let Some(p) = *port {
-                    ui.label(format!("📡 Listening on port {}", p));
-                    ui.label("Waiting for incoming transfers...");
+            ui.separator();
+
+            let is_listening = {
+                if let Ok(port) = self.state.listening_port.lock() {
+                    port.is_some()
                 } else {
-                    if ui.button("🎧 Start Listening").clicked() {
-                        let state = self.state.clone();
-                        
-                        // Spawn a blocking task to start receiving
-                        std::thread::spawn(move || {
-                            let rt = tokio::runtime::Runtime::new().unwrap();
-                            rt.block_on(async {
-                                if let Ok(mut status) = state.app_status.lock() {
-                                    *status = "Starting receiver on port 5001...".to_string();
-                                }
-                                
-                                // Simulate receiving (would call App::receive() here)
-                                // For now, just update the port
-                                if let Ok(mut port_guard) = state.listening_port.lock() {
-                                    *port_guard = Some(5001);
-                                }
-                                
-                                if let Ok(mut status) = state.app_status.lock() {
-                                    *status = "Listening on port 5001".to_string();
-                                }
-                            });
-                        });
+                    false
+                }
+            };
+
+            let is_advertising = {
+                if let Ok(adv) = self.state.advertising_active.lock() {
+                    *adv
+                } else {
+                    false
+                }
+            };
+
+            if is_listening {
+                ui.horizontal(|ui| {
+                    ui.label("✅ Status: Active");
+                });
+                if let Ok(port) = self.state.listening_port.lock() {
+                    if let Some(p) = *port {
+                        ui.label(format!("📡 Listening on port: {}", p));
                     }
+                }
+                if is_advertising {
+                    ui.label("📢 Currently advertising yourself to peers...");
+                }
+                ui.label("Waiting for incoming file transfers...");
+
+                if ui.button("⏹️ Stop Listening").clicked() {
+                    // Stop listening
+                    if let Ok(mut port) = self.state.listening_port.lock() {
+                        *port = None;
+                    }
+                    if let Ok(mut adv) = self.state.advertising_active.lock() {
+                        *adv = false;
+                    }
+                    if let Ok(mut status) = self.state.app_status.lock() {
+                        *status = "Receiver stopped".to_string();
+                    }
+                }
+            } else {
+                if ui.button("🎧 Start Listening (with Advertisement)").clicked() {
+                    let state = self.state.clone();
+                    
+                    std::thread::spawn(move || {
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        rt.block_on(async {
+                            if let Ok(mut adv) = state.advertising_active.lock() {
+                                *adv = true;
+                            }
+
+                            if let Ok(mut messages) = state.messages.lock() {
+                                messages.push(Message {
+                                    content: "Starting CargoDrop in Receive Mode (with background advertisement)...".to_string(),
+                                    level: MessageLevel::Info,
+                                });
+                            }
+
+                            // Set listening port (default 8080 from user info)
+                            // TODO: Get actual port from app.user_info
+                            let port = 8080u16;
+                            if let Ok(mut listening_port) = state.listening_port.lock() {
+                                *listening_port = Some(port);
+                            }
+
+                            if let Ok(mut status) = state.app_status.lock() {
+                                *status = format!("Listening on port {}, advertising...", port);
+                            }
+
+                            if let Ok(mut messages) = state.messages.lock() {
+                                messages.push(Message {
+                                    content: format!("📡 Receiver listening on port {}", port),
+                                    level: MessageLevel::Success,
+                                });
+                                messages.push(Message {
+                                    content: "Waiting for incoming file transfers...".to_string(),
+                                    level: MessageLevel::Info,
+                                });
+                            }
+
+                            // TODO: Actually call app.advertise_and_receive(port) here
+                            // For now, we just show the UI state
+                        });
+                    });
                 }
             }
         });
