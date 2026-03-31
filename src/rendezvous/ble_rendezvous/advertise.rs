@@ -11,7 +11,9 @@ use std::error::Error;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, sleep};
 use uuid::Uuid;
+use std::sync::Arc;
 use crate::user_info::UserInfo;
+use crate::ui::interaction::InteractionHandler;
 
 use super::{APP_SERVICE_UUID, MAX_RAW_PAYLOAD_BYTES, USERNAME_OFFSET};
 
@@ -19,7 +21,6 @@ use super::{APP_SERVICE_UUID, MAX_RAW_PAYLOAD_BYTES, USERNAME_OFFSET};
 struct AdvertiseConfig {
     adapter_power_poll: Duration,
     adapter_power_max_wait: Duration,
-    heartbeat_interval: Duration,
 }
 
 impl Default for AdvertiseConfig {
@@ -27,7 +28,6 @@ impl Default for AdvertiseConfig {
         Self {
             adapter_power_poll: Duration::from_millis(50),
             adapter_power_max_wait: Duration::from_secs(60),
-            heartbeat_interval: Duration::from_secs(5),
         }
     }
 }
@@ -148,30 +148,8 @@ async fn start_advertising(
     Ok(())
 }
 
-fn log_heartbeat(ip: [u8; 4], port: u16, username: &str, device_name_payload: &str) {
-    let time_str = chrono::Local::now().format("%H:%M:%S").to_string();
-    println!("[{}] --- ADVERTISING ACTIVE ---", time_str);
-    println!(
-        "  Broadcasting Username: '{}', IP: {}.{}.{}.{}, Port: {} inside Base64 Name: '{}'",
-        username, ip[0], ip[1], ip[2], ip[3], port, device_name_payload
-    );
-}
-
-async fn run_advertise_heartbeat(
-    ip: [u8; 4],
-    port: u16,
-    username: &str,
-    device_name_payload: &str,
-    config: AdvertiseConfig,
-) -> Result<(), Box<dyn Error>> {
-    loop {
-        log_heartbeat(ip, port, username, device_name_payload);
-        sleep(config.heartbeat_interval).await;
-    }
-}
-
 /// The main advertising loop that continuously advertises the custom network rendezvous payload.
-pub async fn advertise_rendezvous(user: &UserInfo) -> Result<(), Box<dyn Error>> {
+pub async fn advertise_rendezvous(user: &UserInfo, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
     let config = AdvertiseConfig::default();
     let service_uuid = Uuid::parse_str(APP_SERVICE_UUID)?;
 
@@ -185,6 +163,12 @@ pub async fn advertise_rendezvous(user: &UserInfo) -> Result<(), Box<dyn Error>>
     // 3. Start continuously advertising
     start_advertising(&mut peripheral, service_uuid, &device_name_payload).await?;
 
-    // 4. Keep process alive and expose liveness heartbeat.
-    run_advertise_heartbeat(ip, port, &username, &device_name_payload, config).await
+    // 4. Notify the UI handler that advertising has started
+    handler.on_advertising_start(&username, ip, port, &device_name_payload);
+
+    // 5. Keep process alive.
+    // Since we want this to block (as it is currently used in use_cases), we loop forever.
+    loop {
+        sleep(Duration::from_secs(3600)).await;
+    }
 }
