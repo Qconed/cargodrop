@@ -1,6 +1,7 @@
 use std::error::Error;
-
-use crate::rendezvous::RendezvousTrait;
+use std::sync::Arc;
+use crate::rendezvous::{PeerMap, RendezvousTrait};
+use crate::ui::interaction::InteractionHandler;
 use crate::user_info::UserInfo;
 
 pub mod advertise;
@@ -18,15 +19,15 @@ pub(crate) const MAX_RAW_PAYLOAD_BYTES: usize = 32;
 pub struct BleRendezvous {}
 
 impl RendezvousTrait for BleRendezvous {
-    async fn advertise() -> Result<(), Box<dyn Error>> {
+    async fn advertise(user: &UserInfo) -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting advertisement...");
-        let user = UserInfo::load().await?;
-        println!("Loaded user config: username='{}', port={}", user.username, user.port);
-        advertise::advertise_rendezvous(&user).await
+        println!("Using user config: username='{}', port={}", user.username, user.port);
+        advertise::advertise_rendezvous(user).await
     }
     
-    async fn discover() -> Result<(), Box<dyn Error>> {
+    async fn discover(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
         println!("BLE Rendezvous: Starting discovery...");
-        discover::discover_rendezvous().await
+        let service = discover::BleDiscoveryService::new(peers, handler);
+        service.run().await
     }
 }
