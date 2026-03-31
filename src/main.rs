@@ -132,12 +132,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let app = App;
 
-    if cli.gui {
-        // Launch GUI mode with egui/eframe
-        run_gui_mode().await?;
-    } else {
-        // Launch CLI mode
-        cli.run(&app).await?;
+    match &cli.command {
+        cli::Commands::Gui => {
+            // Launch GUI mode with egui/eframe
+            run_gui_mode().await?
+        }
+        _ => {
+            // Launch CLI mode for other commands
+            cli.run(&app).await?
+        }
     }
 
     Ok(())
