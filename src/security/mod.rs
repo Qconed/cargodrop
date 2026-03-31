@@ -17,7 +17,7 @@ pub struct SecureSession {
 
 impl SecureSession {
     /// Initialiser une session sécurisée
-    pub async fn new(nom_appareil: String) -> Result<Self, Box<dyn Error>> {
+    pub async fn new(_nom_appareil: String) -> Result<Self, Box<dyn Error>> {
         // ÉTAPE 1: Créer le répertoire
         println!("🔐 [SÉCURITÉ] ÉTAPE 1: Initialisation de la session");
         let config_dir = home_dir()

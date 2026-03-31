@@ -1,6 +1,5 @@
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey, SharedSecret};
 use sha2::{Sha256, Digest};
-use hmac::{Hmac};
 use hkdf::Hkdf;
 use ed25519_dalek::{Signature, Signer};
 use serde::{Deserialize, Serialize};
