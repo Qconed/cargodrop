@@ -81,12 +81,14 @@ impl Default for GuiAppState {
 /// The main egui application
 pub struct CargodropApp {
     pub state: GuiAppState,
+    pub active_tab: usize,  // Track which tab is active (0=Status, 1=Discover, 2=Send, 3=Receive)
 }
 
 impl Default for CargodropApp {
     fn default() -> Self {
         Self {
             state: GuiAppState::default(),
+            active_tab: 0,
         }
     }
 }
@@ -106,20 +108,18 @@ impl eframe::App for CargodropApp {
 
             // Tab system
             let tabs = vec!["Status", "Discover", "Send", "Receive"];
-            let active_tab = ui.horizontal(|ui| {
-                let mut active = 0;
+            ui.horizontal(|ui| {
                 for (idx, tab_name) in tabs.iter().enumerate() {
-                    if ui.selectable_label(idx == active, *tab_name).clicked() {
-                        active = idx;
+                    if ui.selectable_label(self.active_tab == idx, *tab_name).clicked() {
+                        self.active_tab = idx;
                     }
                 }
-                active
-            }).inner;
+            });
 
             ui.separator();
 
             // Render active tab
-            match active_tab {
+            match self.active_tab {
                 0 => self.render_status_tab(ui),
                 1 => self.render_discover_tab(ui),
                 2 => self.render_send_tab(ui),

@@ -155,7 +155,7 @@ async fn run_gui_mode() -> Result<(), Box<dyn Error>> {
     eframe::run_native(
         "CargoDrop",
         options,
-        Box::new(|_cc| Box::new(CargodropApp { state: GuiAppState::default() })),
+        Box::new(|_cc| Box::new(CargodropApp::default())),
     )
     .map_err(|e| format!("egui error: {}", e).into())
 }
