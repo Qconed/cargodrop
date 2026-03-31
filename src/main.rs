@@ -14,19 +14,13 @@ use user_info::UserInfo;
 use network::file_transfer::PeerInfo;
 use network::tcp_client::TcpClient;
 use network::tcp_server::TcpServer;
-use ui::egui_app::{CargodropApp, GuiAppState};
+use ui::egui_app::CargodropApp;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use crate::ui::interaction::InteractionHandler;
+use crate::ui::cli_handler::CliHandler;
 
-struct App;
-
-<<<<<<< HEAD
-impl Clone for App {
-    fn clone(&self) -> Self {
-        App
-    }
-    
-    fn clone_from(&mut self, source: &Self) {
-        *self = source.clone();
-=======
 #[derive(Clone)]
 struct App {
     peers: rendezvous::PeerMap,
@@ -42,7 +36,6 @@ impl App {
             handler: Arc::new(CliHandler),
             user_info: Arc::new(RwLock::new(user_info)),
         })
->>>>>>> main
     }
 }
 
@@ -63,11 +56,6 @@ impl AppUseCases for App {
             std::sync::Arc::new(ui::cli_handler::CliHandler {});
         
         rendezvous::RendezvousManager::discover_manage(peers, handler).await
-    }
-
-    async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
-        println!("Interactive send initiated for: {}", file_path);
-        Ok(())
     }
 
     async fn send(&self, ip: String, port: Option<u16>, file_path: String) -> Result<(), Box<dyn Error>> {
@@ -194,11 +182,7 @@ impl AppUseCases for App {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-<<<<<<< HEAD
-    let app = App;
-=======
     let app = App::new().await?;
->>>>>>> main
 
     match &cli.command {
         cli::Commands::Gui => {
