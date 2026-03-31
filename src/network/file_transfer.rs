@@ -43,7 +43,7 @@ pub struct TransferResponse {
 pub struct FileTransfer;
 
 impl FileTransfer {
-    pub const CHUNK_SIZE: usize = 4096;
+    pub const CHUNK_SIZE: usize = 1024 * 1024; // 1 MB
 
     /// Prefixes a JSON payload with a u32 length and writes it to the stream.
     pub fn send_json_message<T: Serialize>(
