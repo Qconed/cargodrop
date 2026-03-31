@@ -7,8 +7,8 @@ use std::io::{self, Write};
 pub struct CliHandler;
 
 impl InteractionHandler for CliHandler {
-    fn display_peers_list(&self, peers: &HashMap<String, Peer>) {
-        if peers.is_empty() {
+    fn display_peers_list(&self, active_peers: &HashMap<String, Peer>, lost_peers: &HashMap<String, Peer>) {
+        if active_peers.is_empty() && lost_peers.is_empty() {
             println!("{:<15} | {:<15} | {:<6}", "Username", "IP Address", "Port");
             println!("{:-<42}", "");
             println!("No peers discovered yet.");
@@ -19,13 +19,30 @@ impl InteractionHandler for CliHandler {
         println!("{:<15} | {:<15} | {:<6}", "Username", "IP Address", "Port");
         println!("{:-<42}", ""); // Separator line
 
-        for peer in peers.values() {
+        // Display Active Peers
+        for peer in active_peers.values() {
             let ip_str = format!(
                 "{}.{}.{}.{}",
                 peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3]
             );
             println!("{:<15} | {:<15} | {:<6}", peer.username, ip_str, peer.port);
         }
+
+        // Display Lost Peers if any
+        if !lost_peers.is_empty() {
+            println!("{:-<42}", "");
+            println!("{:<42}", "--- LOST PEERS ---");
+            println!("{:-<42}", "");
+            for peer in lost_peers.values() {
+                let ip_str = format!(
+                    "{}.{}.{}.{}",
+                    peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3]
+                );
+                // Maybe add a status indicator for lost peers
+                println!("{:<15} | {:<15} | {:<6} (LOST)", peer.username, ip_str, peer.port);
+            }
+        }
+
         println!("{:-<42}\n", "");
     }
 

@@ -83,6 +83,8 @@ impl BleDiscoveryService {
     /// display the detected peers list whenever a detection/disconnection happens
     async fn monitor_peers(peers: crate::rendezvous::PeerMap, handler: Arc<dyn InteractionHandler>) {
         let mut last_peers: std::collections::HashMap<String, crate::rendezvous::Peer> = std::collections::HashMap::new();
+        let mut lost_peers: std::collections::HashMap<String, crate::rendezvous::Peer> = std::collections::HashMap::new();
+
         loop {
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             let p = peers.read().await;
@@ -94,6 +96,8 @@ impl BleDiscoveryService {
                 for (key, peer) in p.iter() {
                     if !last_peers.contains_key(key) {
                         handler.handle_peer_event(crate::ui::interaction::PeerEvent::NewPeer(peer.clone(), time_str.clone()));
+                        // If it was previously lost, remove it from the lost list
+                        lost_peers.remove(key);
                     }
                 }
                 
@@ -101,11 +105,13 @@ impl BleDiscoveryService {
                 for (key, peer) in last_peers.iter() {
                     if !p.contains_key(key) {
                         handler.handle_peer_event(crate::ui::interaction::PeerEvent::PeerLost(peer.clone(), time_str.clone()));
+                        // Transfer to the local lost_peers list
+                        lost_peers.insert(key.clone(), peer.clone());
                     }
                 }
 
-                // Display the current snapshot of all active peers using the UI handler
-                handler.display_peers_list(&*p);
+                // Display the current snapshot of all active peers and lost peers using the UI handler
+                handler.display_peers_list(&*p, &lost_peers);
                 
                 last_peers = p.clone();
             }
