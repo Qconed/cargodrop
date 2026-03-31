@@ -44,10 +44,10 @@ impl RendezvousManager {
     }
 
     // advertise presence to others using relevant implementation (by order of preference)
-    pub async fn advertise_manage(user: &UserInfo) -> Result<(), Box<dyn Error>> {
+    pub async fn advertise_manage(user: &UserInfo, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>> {
         match Self::RENDEZVOUS_IMPL {
-            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise(user).await,
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise(user).await,
+            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise(user, handler).await,
+            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise(user, handler).await,
         }
     }
 }
@@ -55,5 +55,5 @@ impl RendezvousManager {
 // traits defining a rendezvous engine (allowing for discovery and advertising)
 pub trait RendezvousTrait {
     async fn discover(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>>;
-    async fn advertise(user: &UserInfo) -> Result<(), Box<dyn Error>>;
+    async fn advertise(user: &UserInfo, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>>;
 }

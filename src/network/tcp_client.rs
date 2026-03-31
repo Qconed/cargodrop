@@ -1,22 +1,29 @@
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 
 use crate::network::file_transfer::{FileTransfer, PeerInfo, TransferRequest, TransferResponse};
+use crate::ui::interaction::InteractionHandler;
 
 /// TCP sender that connects to a peer and streams one file.
 pub struct TcpClient {
     peer: PeerInfo,
     local_device_name: String,
+    handler: Arc<dyn InteractionHandler>,
 }
 
 impl TcpClient {
     /// Creates a new sender client.
-    pub fn new(peer: PeerInfo, local_device_name: String) -> Self {
+    pub fn new(
+        peer: PeerInfo,
+        local_device_name: String,
+        handler: Arc<dyn InteractionHandler>,
+    ) -> Self {
         Self {
             peer,
             local_device_name,
+            handler,
         }
     }
 
@@ -54,17 +61,11 @@ impl TcpClient {
 
         let total_size = file_header.file_size;
         let (progress_tx, progress_rx) = mpsc::channel::<u64>();
+        let handler = self.handler.clone();
 
         let progress_thread = thread::spawn(move || {
             while let Ok(done) = progress_rx.recv() {
-                let percent = FileTransfer::percentage(done, total_size);
-                println!(
-                    "[{}] Sending... {:.0}% ({} / {})",
-                    FileTransfer::timestamp(),
-                    percent,
-                    FileTransfer::human_bytes(done),
-                    FileTransfer::human_bytes(total_size)
-                );
+                handler.update_progress("Sending...", done, total_size);
             }
         });
 

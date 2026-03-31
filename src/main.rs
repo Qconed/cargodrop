@@ -65,7 +65,7 @@ impl AppUseCases for App {
         *SECURE_SESSION.lock().await = Some(session);
         //securite
         let user_guard = self.user_info.read().await;
-        rendezvous::RendezvousManager::advertise_manage(&user_guard).await
+        rendezvous::RendezvousManager::advertise_manage(&user_guard, self.handler.clone()).await
     }
 
     async fn discover(&self) -> Result<(), Box<dyn Error>> {
@@ -106,7 +106,7 @@ impl AppUseCases for App {
             device_name: "receiver".to_string(),
         };
 
-        let client = TcpClient::new(peer, username);
+        let client = TcpClient::new(peer, username, self.handler.clone());
         client.send_file(&file_path)
     }
 
@@ -144,7 +144,7 @@ impl AppUseCases for App {
             println!("🔐 Chiffrement activé avec: {}", hex::encode(&cle_chiffrement[..8]));
         } 
         //securite
-        let server = TcpServer::new(actual_port, username);
+        let server = TcpServer::new(actual_port, username, self.handler.clone());
         server.start()
     }
 
