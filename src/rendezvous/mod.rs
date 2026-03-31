@@ -7,6 +7,7 @@ pub mod lan_rendezvous;
 
 use crate::ui::interaction::InteractionHandler;
 
+use crate::user_info::UserInfo;
 use std::error::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +23,7 @@ pub type PeerMap = Arc<RwLock<HashMap<String, Peer>>>;
 // The RendezVousManager will be in charge of handling the multiple "P2P" discovery means, and will enable switching between implementations
 // LAN is the preffered method, but DNS-SD is blocked over some networks
 // => when LAN impossible, fall back to bluetooth detection.
+#[allow(dead_code)] // @todo implementation of LAN discovery is still to be done
 pub enum RendezvousImpl {
     Lan,
     Bluetooth,
@@ -42,10 +44,10 @@ impl RendezvousManager {
     }
 
     // advertise presence to others using relevant implementation (by order of preference)
-    pub async fn advertise_manage() -> Result<(), Box<dyn Error>> {
+    pub async fn advertise_manage(user: &UserInfo) -> Result<(), Box<dyn Error>> {
         match Self::RENDEZVOUS_IMPL {
-            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise().await,
-            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise().await,
+            RendezvousImpl::Lan => lan_rendezvous::LanRendezvous::advertise(user).await,
+            RendezvousImpl::Bluetooth => ble_rendezvous::BleRendezvous::advertise(user).await,
         }
     }
 }
@@ -53,5 +55,5 @@ impl RendezvousManager {
 // traits defining a rendezvous engine (allowing for discovery and advertising)
 pub trait RendezvousTrait {
     async fn discover(peers: PeerMap, handler: Arc<dyn InteractionHandler>) -> Result<(), Box<dyn Error>>;
-    async fn advertise() -> Result<(), Box<dyn Error>>;
+    async fn advertise(user: &UserInfo) -> Result<(), Box<dyn Error>>;
 }
