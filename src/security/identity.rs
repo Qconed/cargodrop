@@ -31,17 +31,7 @@ impl GestionnaireIdentite {
         }
     }
     
-    pub fn depuis_cles(
-        cle_signature_bytes: &[u8; 32],
-        cle_verification_bytes: &[u8; 32],
-    ) -> Result<Self, Box<dyn Error>> {
-        let cle_signature = SigningKey::from_bytes(cle_signature_bytes);
-        let cle_verification = VerifyingKey::from_bytes(cle_verification_bytes)?;
-        Ok(Self {
-            cle_signature_locale: cle_signature,
-            cle_verification_locale: cle_verification,
-        })
-    }
+   
     
     pub fn obtenir_cle_verification_locale(&self) -> Vec<u8> {
         self.cle_verification_locale.as_bytes().to_vec()

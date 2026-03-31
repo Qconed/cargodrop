@@ -1,11 +1,9 @@
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey, SharedSecret};
 use sha2::{Sha256, Digest};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac};
 use hkdf::Hkdf;
 use ed25519_dalek::{Signature, Signer};
-use std::error::Error;
 use serde::{Deserialize, Serialize};
-type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 
@@ -20,6 +18,7 @@ pub struct MessagePoigneeDeMainInit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct MessagePoigneeDeMainReponse {
     pub cle_ephemere_pub: Vec<u8>,
     pub signature_ephemere: Vec<u8>,
@@ -105,64 +104,4 @@ impl InitiateurPoigneeDeMain {
         cle_chiffrement
     }
    
-    pub fn creer_hmac_confirmation(cle_chiffrement: &[u8; 32]) -> Vec<u8> {
-        let mut mac = HmacSha256::new_from_slice(cle_chiffrement)
-            .expect("HMAC accepte les clés de toutes tailles");
-        mac.update(b"confirmation");
-        mac.finalize().into_bytes().to_vec()
-    }
-  
-    pub fn verifier_hmac_confirmation(
-        cle_chiffrement: &[u8; 32],
-        hmac_recu: &[u8],
-    ) -> Result<(), Box<dyn Error>> {
-        let mut mac = HmacSha256::new_from_slice(cle_chiffrement)?;
-        mac.update(b"confirmation");
-        mac.verify_slice(hmac_recu)?;
-        Ok(())
-    }
-
-    pub fn verifier_signature_ephemere(
-        cle_publique_pair: &[u8],
-        cle_ephemere: &[u8],
-        signature: &[u8; 64],
-    ) -> Result<(), Box<dyn Error>> {
-        use ed25519_dalek::VerifyingKey;
-        
-        let cle_verification = VerifyingKey::from_bytes(
-            <&[u8; 32]>::try_from(&cle_publique_pair[..32])?
-        )?;
-        
-        let sig = Signature::from_bytes(signature);
-        cle_verification.verify_strict(cle_ephemere, &sig)?;
-        
-        Ok(())
-    }
-   
-    //  NOUVEAU: Vérifier la signature du message complet
-    pub fn verifier_signature_message(
-        cle_publique_pair: &[u8],
-        cle_ephemere_pub: &[u8],
-        nom_appareil: &str,
-        signature_message: &[u8; 64],
-    ) -> Result<(), Box<dyn Error>> {
-        use ed25519_dalek::VerifyingKey;
-        
-        // Reconstruire le hash du message
-        let mut hasher = Sha256::new();
-        hasher.update(cle_ephemere_pub);
-        hasher.update(nom_appareil.as_bytes());
-        hasher.update(cle_publique_pair);
-        let message_hash = hasher.finalize();
-        
-        // Vérifier la signature
-        let cle_verification = VerifyingKey::from_bytes(
-            <&[u8; 32]>::try_from(&cle_publique_pair[..32])?
-        )?;
-        
-        let sig = Signature::from_bytes(signature_message);
-        cle_verification.verify_strict(&message_hash, &sig)?;
-        
-        Ok(())
-    }
 }

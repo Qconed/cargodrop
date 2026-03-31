@@ -106,9 +106,11 @@ impl GestionnaireContacts {
 }
 
 /// Dialogue interactif pour approuver un nouveau pair
+#[allow(dead_code)]
 pub struct DialogueApprobation;
 
 impl DialogueApprobation {
+    #[allow(dead_code)]
     pub fn demander_approbation(
         nom_appareil: &str,
         empreinte: &str,
