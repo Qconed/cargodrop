@@ -1,4 +1,4 @@
-use crate::network::file_transfer::PeerInfo;
+use crate::network::file_transfer::{FileTransfer, PeerInfo};
 use crate::rendezvous::Peer;
 use crate::ui::interaction::{InteractionHandler, PeerEvent};
 use std::collections::HashMap;
@@ -85,5 +85,32 @@ impl InteractionHandler for CliHandler {
             "  Broadcasting Username: '{}', IP: {}.{}.{}.{}, Port: {} inside Base64 Name: '{}'",
             username, ip[0], ip[1], ip[2], ip[3], port, device_name_payload
         );
+    }
+
+    fn update_progress(&self, message: &str, done: u64, total: u64) {
+        let percent = FileTransfer::percentage(done, total);
+        let bar_width = 25;
+        let filled_width = (percent / 100.0 * bar_width as f64) as usize;
+        let empty_width = bar_width - filled_width;
+        let bar = format!(
+            "[{}{}]",
+            "=".repeat(filled_width),
+            "-".repeat(empty_width)
+        );
+
+        print!(
+            "\r[{}] {} {:>3.0}% {} {} / {}",
+            FileTransfer::timestamp(),
+            message,
+            percent,
+            bar,
+            FileTransfer::human_bytes(done),
+            FileTransfer::human_bytes(total)
+        );
+        io::stdout().flush().ok();
+
+        if done == total {
+            println!();
+        }
     }
 }

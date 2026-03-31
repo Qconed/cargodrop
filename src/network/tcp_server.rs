@@ -2,23 +2,26 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 
 use crate::network::file_transfer::{FileTransfer, TransferRequest, TransferResponse};
+use crate::ui::interaction::InteractionHandler;
 
 /// TCP receiver that accepts incoming file transfers.
 pub struct TcpServer {
     bind_port: u16,
     device_name: String,
+    handler: Arc<dyn InteractionHandler>,
 }
 
 impl TcpServer {
     /// Creates a new TCP server bound to 0.0.0.0:port.
-    pub fn new(port: u16, device_name: String) -> Self {
+    pub fn new(port: u16, device_name: String, handler: Arc<dyn InteractionHandler>) -> Self {
         Self {
             bind_port: port,
             device_name,
+            handler,
         }
     }
 
@@ -37,8 +40,9 @@ impl TcpServer {
             match stream {
                 Ok(stream) => {
                     let device_name = self.device_name.clone();
+                    let handler = self.handler.clone();
                     thread::spawn(move || {
-                        if let Err(err) = Self::handle_connection(stream, device_name) {
+                        if let Err(err) = Self::handle_connection(stream, device_name, handler) {
                             eprintln!("[{}] Connection error: {}", FileTransfer::timestamp(), err);
                         }
                     });
@@ -52,7 +56,11 @@ impl TcpServer {
         Ok(())
     }
 
-    fn handle_connection(mut stream: TcpStream, device_name: String) -> Result<(), Box<dyn Error>> {
+    fn handle_connection(
+        mut stream: TcpStream,
+        device_name: String,
+        handler: Arc<dyn InteractionHandler>,
+    ) -> Result<(), Box<dyn Error>> {
         let peer_addr = stream.peer_addr()?;
         println!(
             "[{}] Incoming connection from {}",
@@ -98,17 +106,11 @@ impl TcpServer {
 
         let total_size = request.file_header.file_size;
         let (progress_tx, progress_rx) = mpsc::channel::<u64>();
+        let handler_clone = handler.clone();
 
         let progress_thread = thread::spawn(move || {
             while let Ok(done) = progress_rx.recv() {
-                let percent = FileTransfer::percentage(done, total_size);
-                println!(
-                    "[{}] Receiving... {:.0}% ({} / {})",
-                    FileTransfer::timestamp(),
-                    percent,
-                    FileTransfer::human_bytes(done),
-                    FileTransfer::human_bytes(total_size)
-                );
+                handler_clone.update_progress("Receiving...", done, total_size);
             }
         });
 

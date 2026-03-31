@@ -16,4 +16,5 @@ pub trait InteractionHandler: Send + Sync {
     fn handle_peer_event(&self, event: PeerEvent);
     fn select_peer(&self, peers: &[PeerInfo]) -> Option<PeerInfo>;
     fn on_advertising_start(&self, username: &str, ip: [u8; 4], port: u16, device_name_payload: &str);
+    fn update_progress(&self, message: &str, done: u64, total: u64);
 }

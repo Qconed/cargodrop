@@ -65,7 +65,7 @@ impl AppUseCases for App {
             device_name: "receiver".to_string(),
         };
 
-        let client = TcpClient::new(peer, username);
+        let client = TcpClient::new(peer, username, self.handler.clone());
         client.send_file(&file_path)
     }
 
@@ -75,7 +75,7 @@ impl AppUseCases for App {
             (port.unwrap_or(user_guard.port), user_guard.username.clone())
         };
 
-        let server = TcpServer::new(actual_port, username);
+        let server = TcpServer::new(actual_port, username, self.handler.clone());
         server.start()
     }
 
