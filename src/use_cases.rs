@@ -12,8 +12,9 @@ pub trait AppUseCases {
     // "+ Send": This task is safe to move to a different CPU thread if needed. Required to make it "Future"
     fn advertise(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     fn discover(&self) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
-    fn send(&self, ip: String, port: u16, file_path: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
-    fn receive(&self, port: u16) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn send(&self, ip: String, port: Option<u16>, file_path: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn receive(&self, port: Option<u16>) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
+    fn advertise_and_receive(&self, port: Option<u16>) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
     /// Pre: assumes a discovery has been made, and the peers list is populated
     /// Enables a user to send a file to a already detected other peer (asks for peer selection)
     fn interactive_send(&self, file_path: String) -> impl Future<Output = Result<(), Box<dyn Error>>> + Send;
