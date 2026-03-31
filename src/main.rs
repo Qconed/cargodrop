@@ -80,10 +80,8 @@ impl AppUseCases for App {
     }
 
     async fn send(&self, ip: String, port: Option<u16>, file_path: String) -> Result<(), Box<dyn Error>> {
-        let (actual_port, username) = {
-            let user_guard = self.user_info.read().await;
-            (port.unwrap_or(user_guard.port), user_guard.username.clone())
-        };
+        let UserInfo { port: config_port, username, .. } = self.user_info.read().await.clone();
+        let actual_port = port.unwrap_or(config_port);
          //securite
         let mut session = SECURE_SESSION.lock().await;
         if session.is_none() {
@@ -100,7 +98,7 @@ impl AppUseCases for App {
         
         println!(" Chiffrement activé avec: {}", hex::encode(&cle_array[..8]));
          //securite
-        let peer = PeerInfo { // @todo: this should be discovered in future versions
+        let peer = PeerInfo {
             ip,
             port: actual_port,
             device_name: "receiver".to_string(),
@@ -110,11 +108,8 @@ impl AppUseCases for App {
         client.send_file(&file_path)
     }
 
-    async fn receive(&self, port: Option<u16>) -> Result<(), Box<dyn Error>> {
-        let (actual_port, username) = {
-            let user_guard = self.user_info.read().await;
-            (port.unwrap_or(user_guard.port), user_guard.username.clone())
-        };
+    async fn receive(&self) -> Result<(), Box<dyn Error>> {
+        let UserInfo { port: actual_port, username, .. } = self.user_info.read().await.clone();
         //securite
         // Vérifier et initialiser SANS garder le lock
         let needs_init = {
@@ -148,7 +143,7 @@ impl AppUseCases for App {
         server.start()
     }
 
-    async fn advertise_and_receive(&self, port: Option<u16>) -> Result<(), Box<dyn Error>> {
+    async fn advertise_and_receive(&self) -> Result<(), Box<dyn Error>> {
         // Trigger advertisement in the background using the dedicated use case
         let app_clone = self.clone();   // increment reference count to the app. Clone is required because we need a 
                                         // variable that will be able to outlive the function into the tokio thread
@@ -160,7 +155,7 @@ impl AppUseCases for App {
         });
 
         // Start the receive server to listen for incoming files
-        self.receive(port).await
+        self.receive().await
     }
 
     async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {

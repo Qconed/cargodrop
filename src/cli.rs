@@ -30,11 +30,7 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         file: String,
     },
     /// Receive a file
-    Receive {
-        /// Port to listen on
-        #[arg(short, long)]
-        port: Option<u16>,
-    },
+    Receive,
     /// Get local IP address
     GetIp,
     /// Get current username
@@ -94,9 +90,9 @@ impl Cli {
                     use_cases.interactive_send(file).await?;
                 }
             }
-            Commands::Receive { port } => {
+            Commands::Receive => {
                 println!("Starting CargoDrop in Receive Mode (with background advertisement)...");
-                use_cases.advertise_and_receive(port).await?;
+                use_cases.advertise_and_receive().await?;
             }
             Commands::GetIp => {
                 use_cases.get_ip().await?;
