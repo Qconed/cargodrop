@@ -19,11 +19,11 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
     Discover,
     /// Send a file
     Send {
-        /// Receiver's IP address
+        /// Receiver's IP address (if omitted, interactive mode is used)
         #[arg(short, long)]
-        ip: String,
-        /// Receiver's port
-        #[arg(short, long)]
+        ip: Option<String>,
+        /// Receiver's port (only used with --ip)
+        #[arg(short, long, requires = "ip")]
         port: Option<u16>,
         /// Path to the file to send
         #[arg(short, long)]
@@ -34,12 +34,6 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         /// Port to listen on
         #[arg(short, long)]
         port: Option<u16>,
-    },
-    /// Send a file interactively (trigger a discovery, and choose to whom to send)
-    Sendinter {
-        /// Path to the file to send
-        #[arg(short, long)]
-        file: String,
     },
     /// Get local IP address
     GetIp,
@@ -84,24 +78,25 @@ impl Cli {
                 use_cases.discover().await?;
             }
             Commands::Send { ip, port, file } => {
-                println!("Starting CargoDrop in Send Mode...");
-                use_cases.send(ip, port, file).await?;
+                if let Some(ip_addr) = ip {
+                    println!("Starting CargoDrop in Send Mode (Direct to {})...", ip_addr);
+                    use_cases.send(ip_addr, port, file).await?;
+                } else {
+                    // here in the cli for the send, discovery is done as a one off thing
+                    // if no ip is provided (interactive mode)
+                    println!("Starting CargoDrop in Interactive Send Mode...");
+                    println!("Running discovery for 20 seconds...");
+                    let _ = tokio::time::timeout(
+                        std::time::Duration::from_secs(20),
+                        use_cases.discover()
+                    ).await;
+                    
+                    use_cases.interactive_send(file).await?;
+                }
             }
             Commands::Receive { port } => {
                 println!("Starting CargoDrop in Receive Mode (with background advertisement)...");
                 use_cases.advertise_and_receive(port).await?;
-            }
-            Commands::Sendinter { file } => {
-                // here in the cli for the sendinter, discovery is done as a one off thing
-                // but for the GUI, this discovery will probably be a background task
-                println!("Starting CargoDrop in Interactive Send Mode...");
-                println!("Running discovery for 20 seconds...");
-                let _ = tokio::time::timeout(
-                    std::time::Duration::from_secs(20),
-                    use_cases.discover()
-                ).await;
-                
-                use_cases.interactive_send(file).await?;
             }
             Commands::GetIp => {
                 use_cases.get_ip().await?;
