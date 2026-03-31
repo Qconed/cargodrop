@@ -14,7 +14,7 @@ pub(crate) const NETWORK_INFO_BYTES: usize = 6;
 pub(crate) const USERNAME_LEN_BYTES: usize = 1;
 pub(crate) const USERNAME_LEN_OFFSET: usize = NETWORK_INFO_BYTES;
 pub(crate) const USERNAME_OFFSET: usize = NETWORK_INFO_BYTES + USERNAME_LEN_BYTES;
-pub(crate) const MAX_RAW_PAYLOAD_BYTES: usize = 21;
+pub(crate) const MAX_RAW_PAYLOAD_BYTES: usize = 32;
 
 pub struct BleRendezvous {}
 
