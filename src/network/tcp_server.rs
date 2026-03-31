@@ -4,6 +4,7 @@ use std::io::{self, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;
 use std::thread;
+use std::time::Instant;
 
 use crate::network::file_transfer::{FileTransfer, TransferRequest, TransferResponse};
 
@@ -97,6 +98,7 @@ impl TcpServer {
         let mut output_file = File::create(&output_path)?;
 
         let total_size = request.file_header.file_size;
+        let start_time = Instant::now();
         let (progress_tx, progress_rx) = mpsc::channel::<u64>();
 
         let progress_thread = thread::spawn(move || {
@@ -123,9 +125,15 @@ impl TcpServer {
             );
         }
 
+        let elapsed = start_time.elapsed();
+        let elapsed_secs = elapsed.as_secs_f64();
+        let speed_mbs = (total_size as f64 / (1024.0 * 1024.0)) / elapsed_secs;
+
         println!(
-            "[{}] File received successfully and saved to './{}'.",
+            "[{}] File received successfully in {:.2}s at {:.2} MB/s and saved to './{}'.",
             FileTransfer::timestamp(),
+            elapsed_secs,
+            speed_mbs,
             output_path
         );
 
