@@ -186,7 +186,7 @@ pub async fn advertise_rendezvous(user: &UserInfo) -> Result<(), Box<dyn Error>>
     // 1. Prepare payload components from UserInfo
     let (ip, port, username, device_name_payload) = build_advertisement_payload(user,&identite);
 
-    // 2. Initialize BLE Peripheral & Service
+    // 2. Initialize BLE Peripheral & ++Service
     let mut peripheral = init_ble_peripheral(service_uuid).await?;
     wait_until_adapter_powered(&mut peripheral, config).await?;
 
