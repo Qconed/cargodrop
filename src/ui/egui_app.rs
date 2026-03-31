@@ -1,7 +1,8 @@
 use egui::{Color32, RichText, ScrollArea, ProgressBar};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use crate::rendezvous::Peer;
+use crate::rendezvous::{Peer, RendezvousManager};
+use crate::ui::gui_handler::GuiHandler;
 
 /// Shared state for the GUI application
 #[derive(Clone)]
@@ -179,16 +180,42 @@ impl CargodropApp {
                 std::thread::spawn(move || {
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(async {
+                        if let Ok(mut messages) = state.messages.lock() {
+                            messages.push(Message {
+                                content: "Starting CargoDrop in Discovery Mode...".to_string(),
+                                level: MessageLevel::Info,
+                            });
+                        }
                         if let Ok(mut status) = state.app_status.lock() {
-                            *status = "Discovering peers for 20 seconds...".to_string();
+                            *status = "Discovering peers...".to_string();
                         }
                         
-                        // TODO: Call App::discover() here once we have access to App
-                        // For now, just simulate
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        // Create peer map and handler for discovery
+                        let peers = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+                        let handler = Arc::new(GuiHandler::new(state.clone()));
+                        
+                        // Call real discovery
+                        match RendezvousManager::discover_manage(peers, handler).await {
+                            Ok(_) => {
+                                if let Ok(mut messages) = state.messages.lock() {
+                                    messages.push(Message {
+                                        content: "Discovery completed successfully".to_string(),
+                                        level: MessageLevel::Success,
+                                    });
+                                }
+                            },
+                            Err(e) => {
+                                if let Ok(mut messages) = state.messages.lock() {
+                                    messages.push(Message {
+                                        content: format!("Discovery error: {}", e),
+                                        level: MessageLevel::Error,
+                                    });
+                                }
+                            }
+                        }
                         
                         if let Ok(mut status) = state.app_status.lock() {
-                            *status = "Discovery complete".to_string();
+                            *status = "Ready".to_string();
                         }
                     });
                 });
