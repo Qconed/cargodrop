@@ -2,6 +2,7 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::sync::{mpsc, Arc};
 use std::thread;
+use std::time::Instant;
 
 use crate::network::file_transfer::{FileTransfer, PeerInfo, TransferRequest, TransferResponse};
 use crate::ui::interaction::InteractionHandler;
@@ -60,6 +61,7 @@ impl TcpClient {
         );
 
         let total_size = file_header.file_size;
+        let start_time = Instant::now();
         let (progress_tx, progress_rx) = mpsc::channel::<u64>();
         let handler = self.handler.clone();
 
@@ -79,7 +81,16 @@ impl TcpClient {
             );
         }
 
-        println!("[{}] File sent successfully.", FileTransfer::timestamp());
+        let elapsed = start_time.elapsed();
+        let elapsed_secs = elapsed.as_secs_f64();
+        let speed_mbs = (total_size as f64 / (1024.0 * 1024.0)) / elapsed_secs;
+        
+        println!(
+            "[{}] File sent successfully in {:.2}s at {:.2} MB/s.",
+            FileTransfer::timestamp(),
+            elapsed_secs,
+            speed_mbs
+        );
         Ok(())
     }
 }
