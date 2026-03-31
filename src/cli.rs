@@ -78,15 +78,8 @@ impl Cli {
                     println!("Starting CargoDrop in Send Mode (Direct to {})...", ip_addr);
                     use_cases.send(ip_addr, port, file).await?;
                 } else {
-                    // here in the cli for the send, discovery is done as a one off thing
-                    // if no ip is provided (interactive mode)
+                    // here in the cli for the send, discovery and interaction is handled by the use case
                     println!("Starting CargoDrop in Interactive Send Mode...");
-                    println!("Running discovery for 20 seconds...");
-                    let _ = tokio::time::timeout(
-                        std::time::Duration::from_secs(20),
-                        use_cases.discover()
-                    ).await;
-                    
                     use_cases.interactive_send(file).await?;
                 }
             }

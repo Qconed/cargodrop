@@ -158,24 +158,44 @@ impl AppUseCases for App {
         self.receive().await
     }
 
+    /// launches a discovery in the background to provide users to which to send a file
     async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
-        let peer_infos: Vec<PeerInfo> = {
-            let peers_guard = self.peers.read().await;
-            peers_guard.values().map(|p| PeerInfo {
-                ip: format!("{}.{}.{}.{}", p.ip[0], p.ip[1], p.ip[2], p.ip[3]),
-                port: p.port,
-                device_name: p.username.clone(),
-            }).collect()
-        };
+        // Start discovery in background to keep population of peers up to date
+        let app_clone = self.clone();
+        let discovery_task = tokio::spawn(async move {
+            let _ = app_clone.discover().await;
+        });
 
-        // once peer have been searched, called the UI handler to select a peer
-        // behavior will be different if handler = CLI, or GUI, but it will still produce the same result
-        if let Some(selected_peer) = self.handler.select_peer(&peer_infos) {
-            self.send(selected_peer.ip, Some(selected_peer.port), file_path).await
-        } else {
-            println!("No peer selected or operation cancelled.");
-            Ok(())
+        // small initial delay to populate the list at least once
+        println!("Running initial discovery for 15 seconds...");
+        tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+        loop {
+            let peer_infos: Vec<PeerInfo> = {
+                let peers_guard = self.peers.read().await;
+                peers_guard.values().map(|p| PeerInfo {
+                    ip: format!("{}.{}.{}.{}", p.ip[0], p.ip[1], p.ip[2], p.ip[3]),
+                    port: p.port,
+                    device_name: p.username.clone(),
+                }).collect()
+            };
+
+            // once peer have been searched, called the UI handler to select a peer
+            // behavior will be different if handler = CLI, or GUI, but it will still produce the same result
+            if let Some(selected_peer) = self.handler.select_peer(&peer_infos) {
+                if let Err(e) = self.send(selected_peer.ip, Some(selected_peer.port), file_path.clone()).await {
+                    eprintln!("Transfer failed: {}", e);
+                } else {
+                    println!("Transfer complete!");
+                }
+                // loop back to peer selection menu
+            } else {
+                break;
+            }
         }
+        
+        discovery_task.abort();
+        Ok(())
     }
 
     // User info use cases
