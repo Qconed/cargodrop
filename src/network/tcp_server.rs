@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufReader, Write};
+use std::path::PathBuf;
 use std::net::{TcpListener, TcpStream};
 use std::sync::{mpsc, Arc};
 use std::thread;
@@ -101,8 +102,16 @@ impl TcpServer {
             return Ok(());
         }
 
-        std::fs::create_dir_all("received")?;
-        let output_path = format!("received/{}", request.file_header.filename);
+        let download_dir = dirs::download_dir().unwrap_or_else(|| {
+            eprintln!(
+                "[{}] Warning: Downloads directory not found, using 'received' instead.",
+                FileTransfer::timestamp()
+            );
+            PathBuf::from("received")
+        });
+
+        std::fs::create_dir_all(&download_dir)?;
+        let output_path = download_dir.join(&request.file_header.filename);
         let mut output_file = File::create(&output_path)?;
 
         let total_size = request.file_header.file_size;
@@ -132,11 +141,11 @@ impl TcpServer {
         let speed_mbs = (total_size as f64 / (1024.0 * 1024.0)) / elapsed_secs;
 
         println!(
-            "[{}] File received successfully in {:.2}s at {:.2} MB/s and saved to './{}'.",
+            "[{}] File received successfully in {:.2}s at {:.2} MB/s and saved to '{}'.",
             FileTransfer::timestamp(),
             elapsed_secs,
             speed_mbs,
-            output_path
+            output_path.display()
         );
 
         Ok(())
