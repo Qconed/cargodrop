@@ -4,20 +4,96 @@ use crate::ui::interaction::{InteractionHandler, PeerEvent};
 use std::collections::HashMap;
 use std::io::{self, Write};
 
-pub struct CliHandler;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
+
+const BLUE: &str = "\x1b[34m";
+const RED: &str = "\x1b[31m";
+const RESET: &str = "\x1b[0m";
+
+fn blue(s: &str) -> String {
+    format!("{}{}{}", BLUE, s, RESET)
+}
+
+fn red(s: &str) -> String {
+    format!("{}{}{}", RED, s, RESET)
+}
+
+pub struct CliHandler {
+    last_table_height: AtomicUsize,
+    last_events: Mutex<Vec<String>>,
+}
+
+impl CliHandler {
+    pub fn new() -> Self {
+        Self {
+            last_table_height: AtomicUsize::new(0),
+            last_events: Mutex::new(Vec::new()),
+        }
+    }
+}
 
 impl InteractionHandler for CliHandler {
     fn display_peers_list(&self, active_peers: &HashMap<String, Peer>, lost_peers: &HashMap<String, Peer>) {
+        let b = |s: &str| blue(s);
+        let r = |s: &str| red(s);
+
+        // --- IN-PLACE UPDATE LOGIC ---
+        // 1. Move cursor up by the height of the LAST table (if there was one)
+        let prev_h = self.last_table_height.load(Ordering::Relaxed);
+        if prev_h > 0 {
+            // \x1b[{}A = Move cursor Up by N lines
+            // \x1b[J   = Erase from cursor to end of screen
+            print!("\x1b[{}A\x1b[J", prev_h);
+        }
+
+        let mut current_h = 0;
+        let mut println_count = |s: &str| {
+            println!("{}", s);
+            current_h += 1;
+        };
+
+        // 2. Print all events occurred since last update above the table
+        let mut events = self.last_events.lock().unwrap();
+        for msg in events.drain(..) {
+            println_count(&msg);
+        }
+        drop(events);
+
+        // --- THE TABLE ---
+        // Column widths
+        let w_user = 19;
+        let w_ip = 19;
+        let w_port = 10;
+        let total_w = w_user + w_ip + w_port + 2; // +2 for those internal pipes ┬/┼/┴
+
+        let top = format!("{}{}{}{}{}{}{}", b("┌"), b(&"─".repeat(w_user)), b("┬"), b(&"─".repeat(w_ip)), b("┬"), b(&"─".repeat(w_port)), b("┐"));
+        let mid = format!("{}{}{}{}{}{}{}", b("├"), b(&"─".repeat(w_user)), b("┼"), b(&"─".repeat(w_ip)), b("┼"), b(&"─".repeat(w_port)), b("┤"));
+        let bot = format!("{}{}{}{}{}{}{}", b("└"), b(&"─".repeat(w_user)), b("┴"), b(&"─".repeat(w_ip)), b("┴"), b(&"─".repeat(w_port)), b("┘"));
+
         if active_peers.is_empty() && lost_peers.is_empty() {
-            println!("{:<15} | {:<15} | {:<6}", "Username", "IP Address", "Port");
-            println!("{:-<42}", "");
-            println!("No peers discovered yet.");
-            println!("{:-<42}\n", "");
+            println_count(&top);
+            println_count(&format!(
+                "{}{:^w_user$}{}{:^w_ip$}{}{:^w_port$}{}",
+                b("│"), "Username", b("│"), "IP Address", b("│"), "Port", b("│")
+            ));
+            println_count(&mid);
+            println_count(&format!(
+                "{}{:^total_w$}{}",
+                b("│"), "No peers discovered yet.", b("│")
+            ));
+            println_count(&format!("{}\n", bot));
+            io::stdout().flush().ok();
+            self.last_table_height.store(current_h, Ordering::SeqCst);
             return;
         }
 
-        println!("{:<15} | {:<15} | {:<6}", "Username", "IP Address", "Port");
-        println!("{:-<42}", ""); // Separator line
+        println_count(&top);
+        println_count(&format!(
+            "{}{:^w_user$}{}{:^w_ip$}{}{:^w_port$}{}",
+            b("│"), "Username", b("│"), "IP Address", b("│"), "Port", b("│")
+        ));
+        println_count(&mid);
 
         // Display Active Peers
         for peer in active_peers.values() {
@@ -25,36 +101,53 @@ impl InteractionHandler for CliHandler {
                 "{}.{}.{}.{}",
                 peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3]
             );
-            println!("{:<15} | {:<15} | {:<6}", peer.username, ip_str, peer.port);
+            println_count(&format!(
+                "{}{:^w_user$}{}{:^w_ip$}{}{:^w_port$}{}",
+                b("│"), peer.username, b("│"), ip_str, b("│"), peer.port, b("│")
+            ));
         }
 
         // Display Lost Peers if any
         if !lost_peers.is_empty() {
-            println!("{:-<42}", "");
-            println!("{:<42}", "--- LOST PEERS ---");
-            println!("{:-<42}", "");
+            println_count(&mid);
+            let lost_header = format!("{:^total_w$}", "--- ❌ LOST PEERS ---");
+            println_count(&format!("{}{}{}", b("│"), r(&lost_header), b("│")));
+            println_count(&mid);
             for peer in lost_peers.values() {
                 let ip_str = format!(
                     "{}.{}.{}.{}",
                     peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3]
                 );
-                // Maybe add a status indicator for lost peers
-                println!("{:<15} | {:<15} | {:<6} (LOST)", peer.username, ip_str, peer.port);
+                println_count(&format!(
+                    "{}{}{}{}{}{}{}",
+                    b("│"),
+                    r(&format!("{:^w_user$}", peer.username)),
+                    b("│"),
+                    r(&format!("{:^w_ip$}", ip_str)),
+                    b("│"),
+                    r(&format!("{:^w_port$}", peer.port)),
+                    b("│")
+                ));
             }
         }
 
-        println!("{:-<42}\n", "");
+        println_count(&format!("{}\n", bot));
+        io::stdout().flush().ok();
+
+        // Store the height for the next update move-up
+        self.last_table_height.store(current_h, Ordering::SeqCst);
     }
 
     fn handle_peer_event(&self, event: PeerEvent) {
-        match event {
-            PeerEvent::NewPeer(_peer, time) => {
-                println!("\n[{}] --- 📡 PEER DETECTED ---", time);
+        let msg = match event {
+            PeerEvent::NewPeer(peer, time) => {
+                format!("\n[{}] --- 📡 PEER DETECTED: {} ---", time, peer.username)
             }
-            PeerEvent::PeerLost(_peer, time) => {
-                println!("\n[{}] --- ❌ PEER DISCONNECTED ---", time);
+            PeerEvent::PeerLost(peer, time) => {
+                format!("\n[{}] --- ❌ PEER DISCONNECTED: {} ---", time, peer.username)
             }
-        }
+        };
+        self.last_events.lock().unwrap().push(msg);
     }
 
     fn select_peer(&self, peers: &[PeerInfo]) -> Option<PeerInfo> {

@@ -44,7 +44,7 @@ impl App {
         let user_info = UserInfo::load().await?;
         Ok(Self {
             peers: Arc::new(RwLock::new(HashMap::new())),
-            handler: Arc::new(CliHandler),
+            handler: Arc::new(CliHandler::new()),
             user_info: Arc::new(RwLock::new(user_info)),
         })
     }
