@@ -158,20 +158,19 @@ impl AppUseCases for App {
         self.receive().await
     }
 
-    /// launches a discovery for 15 seconds, then stops and asks the user to select a peer.
-    /// This repeats as long as the user wants to send files.
+    /// launches a discovery for 20 seconds, then stops and repeatedly asks the user to select a peer to send files.
     async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
+        // Clear previous peer list for a fresh start at the beginning of the command
+        {
+            let mut peers_guard = self.peers.write().await;
+            peers_guard.clear();
+        }
+
+        println!("Recherche d'appareils pendant 20 secondes...");
+        // initial discovery for 20 seconds
+        let _ = tokio::time::timeout(tokio::time::Duration::from_secs(20), self.discover()).await;
+
         loop {
-            // Clear previous peer list for a fresh start
-            {
-                let mut peers_guard = self.peers.write().await;
-                peers_guard.clear();
-            }
-
-            println!("Recherche d'appareils pendant 20 secondes...");
-            // discovery for 20 seconds
-            let _ = tokio::time::timeout(tokio::time::Duration::from_secs(20), self.discover()).await;
-
             let peer_infos: Vec<PeerInfo> = {
                 let peers_guard = self.peers.read().await;
                 peers_guard.values().map(|p| PeerInfo {
@@ -188,7 +187,7 @@ impl AppUseCases for App {
                 } else {
                     println!("Transfer complete!");
                 }
-                // loop back to step 0
+                // stay in loop for next selection
             } else {
                 break;
             }
