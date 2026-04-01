@@ -110,7 +110,7 @@ impl InteractionHandler for CliHandler {
         // Display Lost Peers if any
         if !lost_peers.is_empty() {
             println_count(&mid);
-            let lost_header = format!("{:^total_w$}", "--- ❌ LOST PEERS ---");
+            let lost_header = format!("{:^total_w$}", "--- X LOST PEERS ---");
             println_count(&format!("{}{}{}", b("│"), r(&lost_header), b("│")));
             println_count(&mid);
             for peer in lost_peers.values() {

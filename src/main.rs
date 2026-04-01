@@ -158,19 +158,20 @@ impl AppUseCases for App {
         self.receive().await
     }
 
-    /// launches a discovery in the background to provide users to which to send a file
+    /// launches a discovery for 15 seconds, then stops and asks the user to select a peer.
+    /// This repeats as long as the user wants to send files.
     async fn interactive_send(&self, file_path: String) -> Result<(), Box<dyn Error>> {
-        // Start discovery in background to keep population of peers up to date
-        let app_clone = self.clone();
-        let discovery_task = tokio::spawn(async move {
-            let _ = app_clone.discover().await;
-        });
-
-        // small initial delay to populate the list at least once
-        println!("Running initial discovery for 15 seconds...");
-        tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-
         loop {
+            // Clear previous peer list for a fresh start
+            {
+                let mut peers_guard = self.peers.write().await;
+                peers_guard.clear();
+            }
+
+            println!("Recherche d'appareils pendant 20 secondes...");
+            // discovery for 20 seconds
+            let _ = tokio::time::timeout(tokio::time::Duration::from_secs(20), self.discover()).await;
+
             let peer_infos: Vec<PeerInfo> = {
                 let peers_guard = self.peers.read().await;
                 peers_guard.values().map(|p| PeerInfo {
@@ -181,20 +182,18 @@ impl AppUseCases for App {
             };
 
             // once peer have been searched, called the UI handler to select a peer
-            // behavior will be different if handler = CLI, or GUI, but it will still produce the same result
             if let Some(selected_peer) = self.handler.select_peer(&peer_infos) {
                 if let Err(e) = self.send(selected_peer.ip, Some(selected_peer.port), file_path.clone()).await {
                     eprintln!("Transfer failed: {}", e);
                 } else {
                     println!("Transfer complete!");
                 }
-                // loop back to peer selection menu
+                // loop back to step 0
             } else {
                 break;
             }
         }
         
-        discovery_task.abort();
         Ok(())
     }
 

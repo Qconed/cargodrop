@@ -28,14 +28,15 @@ impl BleDiscoveryService {
     pub async fn run(&self) -> Result<(), Box<dyn Error>> {
         let adapter = self.setup_adapter().await?;
         
-        // Spawn the monitoring task
+        // Run both the event stream and the monitoring task in parallel.
+        // If this future is cancelled (e.g. by aborting the task), both sub-futures will be dropped and stop.
         let peers_monitor = self.peers.clone();
         let handler_monitor = self.handler.clone();
-        tokio::spawn(async move {
-            Self::monitor_peers(peers_monitor, handler_monitor).await;
-        });
-
-        self.stream_events(adapter).await
+        
+        tokio::select! {
+            res = self.stream_events(adapter) => res,
+            _ = Self::monitor_peers(peers_monitor, handler_monitor) => Ok(()),
+        }
     }
 
     /// Sets up the Bluetooth manager and returns the first available hardware adapter.
