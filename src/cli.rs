@@ -45,9 +45,9 @@ pub enum Commands { // Note : DON'T DELETE THE /// COMMENTS: they are the docume
         #[arg(long)]
         default: bool,
     },
-    /// Get configured HTTP transfer port
+    /// Get configured TCP transfer port
     GetPort,
-    /// Set HTTP transfer port
+    /// Set TCP transfer port
     #[command(group(clap::ArgGroup::new("set-port-action").required(true).args(["port", "default"])))]
     SetPort {
         /// The new port number
