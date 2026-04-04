@@ -1,8 +1,8 @@
-# RustDrop : P2P File Transfer in Rust
+# CargoDrop : P2P File Transfer in Rust
 
-![rustdrop](./doc/assets/rustdrop_ascii.png)
+![cargodrop](./doc/assets/cargodrop_ascii.png)
 
-RustDrop is a decentralized, peer-to-peer file transfer tool inspired by Apple's AirDrop. It allows you to discover nearby devices and securely send files over your local network using a combination of **Bluetooth Low Energy (BLE)** for discovery and **TCP** for high-speed data transfer.
+CargoDrop is a decentralized, peer-to-peer file transfer tool inspired by Apple's AirDrop. It allows you to discover nearby devices and securely send files over your local network using a combination of **Bluetooth Low Energy (BLE)** for discovery and **TCP** for high-speed data transfer.
 
 ### Key Features
 - **Hybrid Protocol**: Bluetooth Low Energy (BLE) based rendezvous (discovery + advertising), with TCP-based file streaming.
@@ -24,7 +24,7 @@ RustDrop is a decentralized, peer-to-peer file transfer tool inspired by Apple's
 
 
 > [!Note]
-> **MacOS/Windows**: This project has **been developed and tested** on Linux. While the libraries used are cross-platform, other OS users may encounter Bluetooth-related issues (especially on Mac, because of bluetooth authorizations). If you do, please [file an issue on GitHub](https://github.com/Qconed/rustdrop/issues).
+> **MacOS/Windows**: This project has **been developed and tested** on Linux. While the libraries used are cross-platform, other OS users may encounter Bluetooth-related issues (especially on Mac, because of bluetooth authorizations). If you do, please [file an issue on GitHub](https://github.com/Qconed/cargodrop/issues).
 
 ### Dependencies
 ```bash
@@ -34,8 +34,8 @@ sudo apt install libdbus-1-dev pkg-config
 
 ### Build
 ```bash
-git clone https://github.com/Qconed/rustdrop.git
-cd rustdrop
+git clone https://github.com/Qconed/cargodrop.git
+cd cargodrop
 cargo build --release
 ```
 
@@ -109,7 +109,7 @@ Options:
 
 ## Architecture
 
-RustDrop follows a clean, decoupled architecture using **Traits** for dependency inversion. This ensures the core transfer logic is agnostic of the UI layer.
+CargoDrop follows a clean, decoupled architecture using **Traits** for dependency inversion. This ensures the core transfer logic is agnostic of the UI layer.
 
 ### Component Diagram
 
@@ -167,6 +167,6 @@ graph TD
 - **Parallel Chunking**: Transferring large files faster by avoid  limiting in parallel over multiple TCP streams for maximum throughput.
 
 ### Architecture Refinement
-- **Library Extraction**: Separating the "Kernel" into a standalone module (`rustdrop-core`) that can be consumed by both CLI and GUI wrappers.
+- **Library Extraction**: Separating the "Kernel" into a standalone module (`cargodrop-core`) that can be consumed by both CLI and GUI wrappers.
 - **Configuration Persistence**: Replacing hardcoded defaults with a centralized `config.toml`.
 
